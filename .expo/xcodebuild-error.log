@@ -1,0 +1,12 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:8C0EB255-E3E9-4A6C-9FB9-2EFDB9098223, OS:18.6, name:iPhone 16 Pro }
+{ platform:iOS Simulator, arch:x86_64, id:8C0EB255-E3E9-4A6C-9FB9-2EFDB9098223, OS:18.6, name:iPhone 16 Pro }
+** BUILD FAILED **
+
+
+The following build commands failed:
+	SwiftCompile normal arm64 /Users/saurabh/Desktop/codex/Travel\ Tracker\ App/node_modules/.pnpm/expo-sqlite@16.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_e1f16c1155a99d599ec4bd782f6e0aa4/node_modules/expo-sqlite/ios/SQLiteModule.swift (in target 'ExpoSQLite' from project 'Pods')
+	SwiftCompile normal arm64 Compiling\ SQLiteModule.swift /Users/saurabh/Desktop/codex/Travel\ Tracker\ App/node_modules/.pnpm/expo-sqlite@16.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_e1f16c1155a99d599ec4bd782f6e0aa4/node_modules/expo-sqlite/ios/SQLiteModule.swift (in target 'ExpoSQLite' from project 'Pods')
+	SwiftCompile normal arm64 Compiling\ ExpoAppDelegate.swift,\ ExpoFetchCustomExtension.swift /Users/saurabh/Desktop/codex/Travel\ Tracker\ App/node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_reac_8ebd62ae5d4761b1ef1f7091b3608952/node_modules/expo/ios/AppDelegates/ExpoAppDelegate.swift /Users/saurabh/Desktop/codex/Travel\ Tracker\ App/node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_reac_8ebd62ae5d4761b1ef1f7091b3608952/node_modules/expo/ios/Fetch/ExpoFetchCustomExtension.swift (in target 'Expo' from project 'Pods')
+	Building workspace TravelNRITracker with scheme TravelNRITracker and configuration Debug
+(4 failures)

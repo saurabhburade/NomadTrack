@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Travel NRI Tracker",
+    "slug": "travel-nri-tracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": [
+      "travelnritracker",
+      "com.googleusercontent.apps.564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i"
+    ],
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.local.travelnritracker",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Travel NRI Tracker uses your location to build your private travel history and country day counts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Background location lets the app update your travel history while you are moving.",
+        "NSLocationAlwaysUsageDescription": "Background location lets the app update your travel history while you are moving.",
+        "NSPhotoLibraryUsageDescription": "Photo access is used only when you choose to import travel history from photo metadata."
+      }
+    },
+    "android": {
+      "package": "com.local.travelnritracker",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "launcher"
+        }
+      ],
+      "expo-location",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-web-browser",
+      "./plugins/with-bound-react-native-factory"
+    ],
+    "extra": {
+      "googleIosClientId": "564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i.apps.googleusercontent.com",
+      "googleIosUrlScheme": "com.googleusercontent.apps.564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i",
+      "googleAndroidClientId": "",
+      "googleWebClientId": ""
+    }
+  }
+}
