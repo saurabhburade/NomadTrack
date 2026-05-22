@@ -156,7 +156,7 @@ export async function writeLocalBackupFile() {
 export async function uploadBackupToDrive() {
   const accessToken = await getGoogleAccessToken();
   assertGoogleAccessToken(accessToken);
-  await showStatusNotification("Taking backup", "Uploading your latest travel backup to Google Drive.");
+  await showStatusNotification("Taking backup", "Uploading your latest travel backup to Google Drive.", { identifier: "nomadtrack-status-backup" });
   const { header, serializedBackup } = await createSerializedJsonBackup();
   const folderId = await getOrCreateDriveBackupFolder(accessToken, header.scope.label);
   const existingBackup = await findDriveBackupFile(accessToken, folderId);

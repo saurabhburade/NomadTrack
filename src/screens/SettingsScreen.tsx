@@ -23,6 +23,7 @@ import {
   XCircle
 } from "lucide-react-native";
 import { Text } from "../components/ui/text";
+import { clearAllLocalData } from "../db/database";
 import { getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import {
   clearGoogleAccessToken,
@@ -78,6 +79,7 @@ export function SettingsScreen() {
   const [googleAuthRequest, response, promptAsync] = useGoogleDriveAuthRequest();
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [isBackupBusy, setIsBackupBusy] = useState(false);
+  const [isResetBusy, setIsResetBusy] = useState(false);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnectionState>(defaultGoogleConnection);
   const [activeDrawer, setActiveDrawer] = useState<SettingsDrawer>(null);
   const [draftResidencyYear, setDraftResidencyYear] = useState(settings.residencyYearEnd);
@@ -272,6 +274,67 @@ export function SettingsScreen() {
     }
   }
 
+  function confirmClearDataAndLogout() {
+    Alert.alert(
+      "Clear data and logout?",
+      "This permanently deletes local travel history, trips, pending validation, settings, backup metadata, and the saved Google token on this device, then returns to onboarding. Google Drive backups are not deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Clear & Logout", style: "destructive", onPress: () => void clearDataAndLogout() }
+      ]
+    );
+  }
+
+  function confirmBackupAndLogout() {
+    Alert.alert(
+      "Backup and logout?",
+      "NomadTrack will upload a fresh Google Drive backup, clear local data and settings from this device, disconnect Google, then return to onboarding.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Backup & Logout", style: "destructive", onPress: () => void backupAndLogout() }
+      ]
+    );
+  }
+
+  async function backupAndLogout() {
+    setIsResetBusy(true);
+    setIsBackupBusy(true);
+    try {
+      const canUseBackup = await ensureGoogleDriveLogin();
+      if (!canUseBackup) return;
+
+      setBackupStatus({ tone: "info", message: "Uploading backup before logout..." });
+      await uploadBackupToDrive();
+      await clearDeviceAndReturnToOnboarding("Backup complete. Local data cleared and Google disconnected.");
+    } catch (error) {
+      handleBackupError(error, "Backup and logout failed.");
+    } finally {
+      setIsBackupBusy(false);
+      setIsResetBusy(false);
+    }
+  }
+
+  async function clearDataAndLogout() {
+    setIsResetBusy(true);
+    try {
+      await clearDeviceAndReturnToOnboarding("Local data cleared and Google disconnected.");
+    } catch (error) {
+      setBackupStatus({ tone: "error", message: error instanceof Error ? error.message : "Could not clear local data." });
+    } finally {
+      setIsResetBusy(false);
+    }
+  }
+
+  async function clearDeviceAndReturnToOnboarding(successMessage: string) {
+    await stopBackgroundTracking();
+    await clearGoogleAccessToken();
+    await clearAllLocalData();
+    setBackupStatus({ tone: "success", message: successMessage });
+    setGoogleConnection(defaultGoogleConnection);
+    await setSelectedDate(new Date().toISOString().slice(0, 10));
+    await refresh();
+  }
+
   return (
     <>
       <ScrollView
@@ -383,6 +446,26 @@ export function SettingsScreen() {
             <SettingsRow Icon={Download} detail="Local JSON file" palette={palette} title="Save Local Backup" onPress={() => void writeLocalBackupFile()} />
             <SettingsDivider palette={palette} />
             <SettingsRow Icon={LogOut} destructive detail={googleConnection.isConnected ? "Remove saved token" : "No account connected"} palette={palette} title="Disconnect Google" onPress={() => void disconnectGoogleDrive()} />
+            <SettingsDivider palette={palette} />
+            <SettingsRow
+              Icon={CloudUpload}
+              destructive
+              detail={googleDriveUnavailable ? "Needs Google Drive" : "Backup, clear, and return to onboarding"}
+              disabled={isResetBusy || isBackupBusy || googleDriveUnavailable}
+              palette={palette}
+              title={isResetBusy ? "Working..." : "Backup & Logout"}
+              onPress={confirmBackupAndLogout}
+            />
+            <SettingsDivider palette={palette} />
+            <SettingsRow
+              Icon={XCircle}
+              destructive
+              detail="Clear device and return to onboarding"
+              disabled={isResetBusy}
+              palette={palette}
+              title={isResetBusy ? "Clearing..." : "Clear & Logout"}
+              onPress={confirmClearDataAndLogout}
+            />
           </SettingsGroup>
         </SettingsSection>
 

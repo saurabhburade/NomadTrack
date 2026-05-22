@@ -12,7 +12,7 @@ struct LogTodayCountryIntent: AppIntent {
   func perform() async throws -> some IntentResult {
     ForceQuitLocationService.shared.postStatusNotification(
       title: "Taking location",
-      body: "Updating today's travel location."
+      body: "T7 shortcuts Updating today's travel location."
     )
     ForceQuitLocationService.shared.requestOneShot(source: "shortcuts")
     return .result()

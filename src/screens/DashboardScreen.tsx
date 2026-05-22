@@ -23,6 +23,7 @@ import { Text } from "../components/ui/text";
 import { distributionColors, getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import { compactNumber, formatRelativeTime } from "../lib/utils";
 import { formatResidencyYearLabel, getResidencyYearDayCount } from "../services/calculations/residencyYear";
+import { prepareTravelReportPreview, shareTravelReportPdf, type ReportKind, type TravelReportPreview } from "../services/export/reportPdf";
 import { captureAutomaticLocationNow, captureManualLocation, hasBackgroundTrackingPermission, startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 import type { TrackingIntervalHours } from "../types/models";
@@ -32,12 +33,14 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function DashboardScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList, "Dashboard">>();
-  const { summary, isOffline, settings, refresh, runGeocodeQueue, updateSetting } = useAppStore();
+  const { summary, isOffline, selectedDate, settings, refresh, runGeocodeQueue, updateSetting } = useAppStore();
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
-  const [shareAfterQuickMenuClose, setShareAfterQuickMenuClose] = useState(false);
+  const [pendingQuickMenuAction, setPendingQuickMenuAction] = useState<"share" | ReportKind | null>(null);
   const [isYearSelectorOpen, setIsYearSelectorOpen] = useState(false);
   const [isAutomationGuideOpen, setIsAutomationGuideOpen] = useState(false);
   const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportPreview, setReportPreview] = useState<TravelReportPreview | null>(null);
   const [isAutoTrackStarting, setIsAutoTrackStarting] = useState(false);
   const [pendingAutoTrackEnable, setPendingAutoTrackEnable] = useState(false);
   const [hasAlwaysLocationPermission, setHasAlwaysLocationPermission] = useState(false);
@@ -149,15 +152,58 @@ export function DashboardScreen() {
   }
 
   function requestShareSummary() {
-    setShareAfterQuickMenuClose(true);
+    setPendingQuickMenuAction("share");
+    setIsQuickMenuOpen(false);
+  }
+
+  function requestReport(kind: ReportKind) {
+    setPendingQuickMenuAction(kind);
     setIsQuickMenuOpen(false);
   }
 
   function handleQuickMenuClosed() {
-    if (!shareAfterQuickMenuClose) return;
+    if (!pendingQuickMenuAction) return;
 
-    setShareAfterQuickMenuClose(false);
-    requestAnimationFrame(shareSummary);
+    const action = pendingQuickMenuAction;
+    setPendingQuickMenuAction(null);
+    requestAnimationFrame(() => {
+      if (action === "share") {
+        shareSummary();
+        return;
+      }
+
+      void openReportPreview(action);
+    });
+  }
+
+  async function openReportPreview(kind: ReportKind) {
+    if (isGeneratingReport) return;
+
+    setIsGeneratingReport(true);
+    try {
+      const report = await prepareTravelReportPreview({ kind, selectedDate, settings });
+      setReportPreview(report);
+    } catch (error) {
+      Alert.alert("Report failed", error instanceof Error ? error.message : "Could not create the report preview.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }
+
+  async function shareReportPreview() {
+    if (!reportPreview || isGeneratingReport) return;
+
+    setIsGeneratingReport(true);
+    try {
+      const result = await shareTravelReportPdf(reportPreview, isDark);
+      if (!result.didShare && result.uri) {
+        Alert.alert("Report ready", `${result.title} was saved as a PDF.`);
+      }
+    } catch (error) {
+      Alert.alert("Report failed", error instanceof Error ? error.message : "Could not create the PDF report.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
   }
 
   async function setAutoTrackLocation(enabled: boolean) {
@@ -387,9 +433,18 @@ export function DashboardScreen() {
       <DashboardQuickMenu
         palette={palette}
         visible={isQuickMenuOpen}
+        onReport={requestReport}
         onShare={requestShareSummary}
         onClose={() => setIsQuickMenuOpen(false)}
         onClosed={handleQuickMenuClosed}
+      />
+      <ReportPreviewDrawer
+        isSharing={isGeneratingReport}
+        palette={palette}
+        report={reportPreview}
+        visible={Boolean(reportPreview)}
+        onClose={() => setReportPreview(null)}
+        onShare={() => void shareReportPreview()}
       />
       <YearSelectorDrawer
         palette={palette}
@@ -493,12 +548,14 @@ function HeaderGlassButton({
 function DashboardQuickMenu({
   palette,
   visible,
+  onReport,
   onShare,
   onClose,
   onClosed
 }: {
   palette: Palette;
   visible: boolean;
+  onReport: (kind: ReportKind) => void;
   onShare: () => void;
   onClose: () => void;
   onClosed: () => void;
@@ -573,9 +630,9 @@ function DashboardQuickMenu({
           <View style={[styles.quickMenuRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
           <View style={styles.quickMenuContent}>
             <MenuActionRow icon={Share} label="Share Summary" palette={palette} onPress={handleShare} />
-            <MenuActionRow icon={FileText} label="Monthly Report" palette={palette} onPress={onClose} />
-            <MenuActionRow icon={CalendarDays} label="Calendar Year Report" palette={palette} onPress={onClose} />
-            <MenuActionRow icon={Banknote} label="Fiscal Year Report" palette={palette} onPress={onClose} />
+            <MenuActionRow icon={FileText} label="Monthly Report" palette={palette} onPress={() => onReport("monthly")} />
+            <MenuActionRow icon={CalendarDays} label="Calendar Year Report" palette={palette} onPress={() => onReport("calendar")} />
+            <MenuActionRow icon={Banknote} label="Fiscal Year Report" palette={palette} onPress={() => onReport("fiscal")} />
           </View>
         </Animated.View>
       </View>
@@ -599,6 +656,297 @@ function MenuActionRow({ icon: Icon, label, palette, onPress }: { icon: MenuIcon
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function ReportPreviewDrawer({
+  isSharing,
+  palette,
+  report,
+  visible,
+  onClose,
+  onShare
+}: {
+  isSharing: boolean;
+  palette: Palette;
+  report: TravelReportPreview | null;
+  visible: boolean;
+  onClose: () => void;
+  onShare: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [isRendered, setIsRendered] = useState(visible);
+  const [renderedReport, setRenderedReport] = useState<TravelReportPreview | null>(report);
+  const progress = useSharedValue(visible ? 1 : 0);
+  const dragY = useSharedValue(0);
+  const displayReport = report ?? renderedReport;
+
+  useEffect(() => {
+    if (visible && report) {
+      setRenderedReport(report);
+      setIsRendered(true);
+      dragY.value = 0;
+      progress.value = withSpring(1, {
+        damping: 24,
+        mass: 0.85,
+        stiffness: 190
+      });
+      return;
+    }
+
+    progress.value = withTiming(
+      0,
+      {
+        duration: 190,
+        easing: ReanimatedEasing.in(ReanimatedEasing.quad)
+      },
+      (finished) => {
+        if (finished) {
+          dragY.value = 0;
+          runOnJS(setIsRendered)(false);
+          runOnJS(setRenderedReport)(null);
+        }
+      }
+    );
+  }, [dragY, progress, report, visible]);
+
+  const drawerGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY(8)
+        .failOffsetX([-18, 18])
+        .onUpdate((event) => {
+          dragY.value = Math.max(0, event.translationY);
+        })
+        .onEnd((event) => {
+          const shouldClose = event.translationY > 96 || event.velocityY > 820;
+          if (shouldClose) {
+            runOnJS(onClose)();
+            return;
+          }
+
+          dragY.value = withSpring(0, {
+            damping: 22,
+            mass: 0.8,
+            stiffness: 220
+          });
+        }),
+    [dragY, onClose]
+  );
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: progress.value * interpolate(dragY.value, [0, 240], [1, 0.22], Extrapolation.CLAMP)
+  }));
+
+  const drawerStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.55, 1], [0, 1, 1]),
+    transform: [
+      { translateY: interpolate(progress.value, [0, 1], [520, 0]) + dragY.value },
+      { scale: interpolate(dragY.value, [0, 240], [1, 0.985], Extrapolation.CLAMP) }
+    ]
+  }));
+
+  if (!isRendered || !displayReport) return null;
+
+  const maxCountryDays = displayReport.stats.countryTotals.reduce((max, row) => Math.max(max, row.days), 1);
+  const countryRows = displayReport.stats.countryTotals.slice(0, 5);
+  const detailRows = displayReport.detailRows.slice(0, displayReport.period.kind === "monthly" ? 31 : 10);
+
+  return (
+    <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
+          <GlassBlurLayer tint={palette.blurTint} intensity={14} style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
+        </Animated.View>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.reportDrawer,
+            {
+              backgroundColor: palette.menuGlassFill,
+              borderColor: palette.glassBorder,
+              paddingBottom: Math.max(insets.bottom, 14) + 10,
+              shadowColor: palette.glassShadow
+            },
+            drawerStyle
+          ]}
+        >
+          <GlassBlurLayer tint={palette.blurTint} intensity={64} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
+          <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
+          <View style={[styles.yearDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
+          <GestureDetector gesture={drawerGesture}>
+            <Animated.View style={styles.drawerHandleTouchArea}>
+              <View style={[styles.drawerHandle, { backgroundColor: palette.glassBorderActive }]} />
+            </Animated.View>
+          </GestureDetector>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.reportPreviewScroll} contentContainerStyle={styles.reportPreviewContent}>
+            <View className="flex-row items-start gap-3">
+              <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: palette.pill }}>
+                <FileText size={20} color={palette.accent} strokeWidth={iconStrokeWidth} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold" style={{ color: palette.foreground }}>
+                  {displayReport.period.title}
+                </Text>
+                <Text className="text-xs" style={{ color: palette.muted }}>
+                  {displayReport.period.label} - {displayReport.rangeLabel}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.reportMetricGrid}>
+              <ReportMetric label="India" palette={palette} value={displayReport.stats.indiaDays} />
+              <ReportMetric label="Abroad" palette={palette} value={displayReport.stats.outsideIndiaDays} />
+              <ReportMetric label="Tracked" palette={palette} value={displayReport.stats.trackedDays} />
+              <ReportMetric label="Missing" palette={palette} value={displayReport.stats.untrackedDays} />
+            </View>
+
+            <View style={[styles.reportPanel, { backgroundColor: palette.pill }]}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                Travel calendar
+              </Text>
+              <ReportCalendarDots palette={palette} report={displayReport} />
+            </View>
+
+            <View style={[styles.reportPanel, { backgroundColor: palette.pill }]}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                Country breakdown
+              </Text>
+              {countryRows.length > 0 ? (
+                <View className="mt-3 gap-3">
+                  {countryRows.map((row, index) => (
+                    <View key={row.countryCode} className="gap-2">
+                      <View className="flex-row items-center justify-between gap-3">
+                        <Text className="flex-1 text-xs font-bold" numberOfLines={1} style={{ color: palette.foreground }}>
+                          {row.countryName}
+                        </Text>
+                        <Text className="text-xs font-bold" style={{ color: palette.muted }}>
+                          {compactNumber(row.days)}
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        color={getDistributionColor(index, palette)}
+                        progress={Math.max(4, Math.round((row.days / maxCountryDays) * 100))}
+                        trackColor={palette.track}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="mt-3 text-xs" style={{ color: palette.muted }}>
+                  No tracked country days in this period.
+                </Text>
+              )}
+            </View>
+
+            <View style={[styles.reportPanel, { backgroundColor: palette.pill }]}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                {displayReport.period.kind === "monthly" ? "Week breakdown" : "Monthly breakdown"}
+              </Text>
+              <View className="mt-3 gap-2">
+                {displayReport.stats.monthRows.map((row) => (
+                  <View key={row.label} className="flex-row items-center justify-between gap-2">
+                    <Text className="w-16 text-xs font-bold" style={{ color: palette.foreground }}>
+                      {row.label}
+                    </Text>
+                    <Text className="flex-1 text-xs" numberOfLines={1} style={{ color: palette.muted }}>
+                      India {row.india} / Abroad {row.abroad}
+                    </Text>
+                    <Text className="text-xs font-bold" style={{ color: palette.foreground }}>
+                      {row.tracked}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.reportPanel, { backgroundColor: palette.pill }]}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                {displayReport.detailTitle}
+              </Text>
+              <View className="mt-3 gap-2">
+                {detailRows.map((row) => (
+                  <View key={`${row.date}-${row.countryCode}`} className="flex-row items-center gap-2">
+                    <Text className="w-24 text-xs font-bold" style={{ color: palette.foreground }}>
+                      {row.date}
+                    </Text>
+                    <Text className="flex-1 text-xs" numberOfLines={1} style={{ color: palette.muted }}>
+                      {row.countryName}
+                    </Text>
+                    <Text className="text-xs font-bold" style={{ color: palette.foreground }}>
+                      {row.status}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View className="mx-5 mt-3 flex-row gap-3">
+            <Pressable accessibilityRole="button" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                Close
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={isSharing} className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent, opacity: isSharing ? 0.7 : 1 }} onPress={onShare}>
+              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
+                {isSharing ? "Creating PDF" : "Share PDF"}
+              </Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+function ReportMetric({ label, palette, value }: { label: string; palette: Palette; value: number }) {
+  return (
+    <View className="flex-1 rounded-2xl px-3 py-3" style={{ backgroundColor: palette.pill }}>
+      <Text className="text-[11px] font-bold" numberOfLines={1} style={{ color: palette.muted }}>
+        {label}
+      </Text>
+      <Text className="mt-1 text-lg font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
+        {compactNumber(value)}
+      </Text>
+    </View>
+  );
+}
+
+function ReportCalendarDots({ palette, report }: { palette: Palette; report: TravelReportPreview }) {
+  const countryColorByCode = useMemo(() => {
+    const colors = new Map<string, string>();
+    report.stats.countryTotals.forEach((row, index) => colors.set(row.countryCode, getDistributionColor(index, palette)));
+    return colors;
+  }, [palette, report.stats.countryTotals]);
+
+  const dotSize = report.calendarMonths.length > 1 ? 6 : 8;
+  const dotGap = report.calendarMonths.length > 1 ? 4 : 5;
+  const gridWidth = dotSize * 7 + dotGap * 6;
+  const tileWidth = Math.max(64, gridWidth);
+
+  return (
+    <View style={styles.reportCalendarGrid}>
+      {report.calendarMonths.map((month) => (
+        <View key={month.key} style={[styles.reportMonthTile, { width: tileWidth }]}>
+          <Text className="text-xs font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted }}>
+            {month.label}
+          </Text>
+          <View style={[styles.reportDotGrid, { gap: dotGap, width: gridWidth }]}>
+            {month.slots.map((slot) => {
+              if (!slot.date) {
+                return <View key={slot.key} style={{ height: dotSize, width: dotSize }} />;
+              }
+
+              const backgroundColor = slot.countryCode ? countryColorByCode.get(slot.countryCode) ?? getDistributionColor(5, palette) : palette.remaining;
+              return <View key={slot.key} style={[styles.reportDot, { backgroundColor, height: dotSize, width: dotSize }]} />;
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -1345,6 +1693,56 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -18 },
     shadowOpacity: 0.24,
     shadowRadius: 34
+  },
+  reportDrawer: {
+    borderCurve: "continuous",
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    borderWidth: 1,
+    bottom: 0,
+    left: 0,
+    maxHeight: "88%",
+    overflow: "hidden",
+    paddingTop: 12,
+    position: "absolute",
+    right: 0,
+    shadowOffset: { width: 0, height: -18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 34
+  },
+  reportPreviewContent: {
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    paddingTop: 12
+  },
+  reportPreviewScroll: {
+    flexShrink: 1
+  },
+  reportMetricGrid: {
+    flexDirection: "row",
+    gap: 8
+  },
+  reportPanel: {
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14
+  },
+  reportCalendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+    marginTop: 14
+  },
+  reportMonthTile: {
+    gap: 8
+  },
+  reportDotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap"
+  },
+  reportDot: {
+    borderRadius: 999
   },
   yearDrawerRim: {
     ...StyleSheet.absoluteFillObject,

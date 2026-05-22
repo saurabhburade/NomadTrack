@@ -100,6 +100,18 @@ export async function hasLocalTravelData() {
   return (result?.count ?? 0) > 0;
 }
 
+export async function clearAllLocalData() {
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync("DELETE FROM pending_geocode_jobs");
+    await db.runAsync("DELETE FROM day_country_segments");
+    await db.runAsync("DELETE FROM day_records");
+    await db.runAsync("DELETE FROM trips");
+    await db.runAsync("DELETE FROM location_points");
+    await db.runAsync("DELETE FROM backup_metadata");
+    await db.runAsync("DELETE FROM settings");
+  });
+}
+
 export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt" | "updatedAt">) {
   const now = new Date().toISOString();
   const date = point.timestamp.slice(0, 10);
@@ -271,6 +283,15 @@ export async function readDayRecordsForDashboardYear() {
     "SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC",
     window.startDate,
     window.endDate
+  );
+}
+
+export async function readDayRecordsForDateRange(startDate: string, endDate: string) {
+  const db = await getDb();
+  return db.getAllAsync<DayRecordRow>(
+    "SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC",
+    startDate,
+    endDate
   );
 }
 
@@ -544,7 +565,7 @@ type PendingGeocodeJobRow = {
   updated_at: string;
 };
 
-type DayRecordRow = {
+export type DayRecordRow = {
   date: string;
   primary_country_code: string | null;
   primary_country_name: string | null;

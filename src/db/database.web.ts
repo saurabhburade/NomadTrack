@@ -59,6 +59,13 @@ export async function hasLocalTravelData() {
   return readStoredPoints().length > 0 || readStoredDayRecords().length > 0 || readStoredTrips().length > 0;
 }
 
+export async function clearAllLocalData() {
+  globalThis.localStorage?.removeItem(SETTINGS_KEY);
+  globalThis.localStorage?.removeItem(POINTS_KEY);
+  globalThis.localStorage?.removeItem(DAY_RECORDS_KEY);
+  globalThis.localStorage?.removeItem(TRIPS_KEY);
+}
+
 export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt" | "updatedAt">) {
   const now = new Date().toISOString();
   const date = point.timestamp.slice(0, 10);
@@ -150,13 +157,17 @@ export async function readLocationPointsForDashboardYear() {
 export async function readDayRecordsForDashboardYear() {
   const settings = await readSettings();
   const window = getResidencyYearWindow(settings, currentYear);
-  const records = readStoredDayRecords().filter((record) => record.date >= window.startDate && record.date <= window.endDate);
+  return readDayRecordsForDateRange(window.startDate, window.endDate);
+}
+
+export async function readDayRecordsForDateRange(startDate: string, endDate: string) {
+  const records = readStoredDayRecords().filter((record) => record.date >= startDate && record.date <= endDate);
   const recordedDates = new Set(records.map((record) => record.date));
   const latestPointsByDate = new Map<string, LocationPoint>();
 
   for (const point of readStoredPoints()) {
     const date = point.timestamp.slice(0, 10);
-    if (date < window.startDate || date > window.endDate || recordedDates.has(date)) continue;
+    if (date < startDate || date > endDate || recordedDates.has(date)) continue;
 
     const existing = latestPointsByDate.get(date);
     if (!existing || point.timestamp > existing.timestamp) {

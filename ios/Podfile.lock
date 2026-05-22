@@ -300,6 +300,8 @@ PODS:
     - Yoga
   - ExpoNetwork (8.0.8):
     - ExpoModulesCore
+  - ExpoPrint (15.0.8):
+    - ExpoModulesCore
   - ExpoSecureStore (15.0.8):
     - ExpoModulesCore
   - ExpoSharing (14.0.8):
@@ -3040,6 +3042,7 @@ DEPENDENCIES:
   - "ExpoMediaLibrary (from `../node_modules/.pnpm/expo-media-library@18.2.1_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-na_a40de742e0b5acd0ae893b37ae1bc274/node_modules/expo-media-library/ios`)"
   - "ExpoModulesCore (from `../node_modules/.pnpm/expo-modules-core@3.0.30_react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-con_ac76d47430b4ab29f9d83bb0fefea6a0/node_modules/expo-modules-core`)"
   - "ExpoNetwork (from `../node_modules/.pnpm/expo-network@8.0.8_expo@54.0.34_react@19.1.0/node_modules/expo-network/ios`)"
+  - "ExpoPrint (from `../node_modules/.pnpm/expo-print@15.0.8_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+met_ce791351057abb5d07545cc47e8c8781/node_modules/expo-print/ios`)"
   - "ExpoSecureStore (from `../node_modules/.pnpm/expo-secure-store@15.0.8_expo@54.0.34/node_modules/expo-secure-store/ios`)"
   - "ExpoSharing (from `../node_modules/.pnpm/expo-sharing@14.0.8_expo@54.0.34/node_modules/expo-sharing/ios`)"
   - "ExpoSQLite (from `../node_modules/.pnpm/expo-sqlite@16.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_e1f16c1155a99d599ec4bd782f6e0aa4/node_modules/expo-sqlite/ios`)"
@@ -3182,6 +3185,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-modules-core@3.0.30_react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-con_ac76d47430b4ab29f9d83bb0fefea6a0/node_modules/expo-modules-core"
   ExpoNetwork:
     :path: "../node_modules/.pnpm/expo-network@8.0.8_expo@54.0.34_react@19.1.0/node_modules/expo-network/ios"
+  ExpoPrint:
+    :path: "../node_modules/.pnpm/expo-print@15.0.8_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+met_ce791351057abb5d07545cc47e8c8781/node_modules/expo-print/ios"
   ExpoSecureStore:
     :path: "../node_modules/.pnpm/expo-secure-store@15.0.8_expo@54.0.34/node_modules/expo-secure-store/ios"
   ExpoSharing:
@@ -3377,6 +3382,7 @@ SPEC CHECKSUMS:
   ExpoMediaLibrary: a3093b04365b245bb23b25b6eba84eb6ab55fecb
   ExpoModulesCore: 20899b4dd703e10a543ff4c50ee1543e47d90082
   ExpoNetwork: ee1fb67b0de59ab7f36794caf8242955dd8ae046
+  ExpoPrint: 813bfa965eda2ecc4b1cdc61612c820e239c382a
   ExpoSecureStore: d32f751874a2ceb5aaeebeb3578e165c1ba2b24a
   ExpoSharing: 0d983394ed4a80334bab5a0d5384f75710feb7e8
   ExpoSQLite: 7eedbe476870a5f18d6b89c817c4ac6f299830ad

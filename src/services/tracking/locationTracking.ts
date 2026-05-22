@@ -82,6 +82,19 @@ const forceQuitLocationModule = NativeModules.ForceQuitLocationModule as ForceQu
 const forceQuitLocationEventName = "ForceQuitLocationEvent";
 const shortcutAutomationSources = new Set<LocationSource>(["shortcuts"]);
 const forceQuitLocationSources = new Set<LocationSource>(["visit", "slc", "region-exit", "region-enter", "shortcuts", "charger-connected"]);
+const locationTriggerLabels: Record<LocationSource, string> = {
+  manual: "T1 manual",
+  gps: "T2 auto-gps",
+  gps_offline: "T2 auto-gps-offline",
+  slc: "T3 significant-change",
+  visit: "T4 visit",
+  "region-exit": "T5 region-exit",
+  "region-enter": "T6 region-enter",
+  shortcuts: "T7 shortcuts",
+  "charger-connected": "T8 charger",
+  photo: "T9 photo",
+  import: "T10 import"
+};
 
 let nativeBackgroundGeolocation: NativeBackgroundGeolocation | null | undefined;
 let nativeLocationSubscription: NativeSubscription | undefined;
@@ -192,8 +205,11 @@ export async function captureAutomaticLocationNow() {
 }
 
 async function persistLocation(location: PersistableLocation, requestedSource: LocationSource, options: PersistLocationOptions = {}) {
+  const triggerLabel = locationTriggerLabels[requestedSource];
+  console.info(`[location] ${triggerLabel} capture requested`);
+
   if (options.notify !== false) {
-    await showStatusNotification("Taking location", "Updating today's travel location.");
+    await showStatusNotification("Taking location", `${triggerLabel} Updating today's travel location.`, { identifier: "nomadtrack-status-location" });
   }
 
   const network = await Network.getNetworkStateAsync();
@@ -226,7 +242,7 @@ async function persistLocation(location: PersistableLocation, requestedSource: L
 }
 
 async function handleAutomaticLocation(location: PersistableLocation, source: LocationSource = "gps") {
-  await persistLocation(location, source);
+  await persistLocation(location, source, { notify: false });
   await runBackupAfterLocation();
 }
 
@@ -298,6 +314,11 @@ async function processCoreLocationWakeEvent(event: CoreLocationWakeEvent, backup
 }
 
 async function startNativeBackgroundTracking(interval: Exclude<TrackingIntervalHours, "manual">) {
+  if (isDebugBuild()) {
+    console.info("[location] Skipping native BGGeo provider in debug build to avoid license validation notifications.");
+    return false;
+  }
+
   const BackgroundGeolocation = loadNativeBackgroundGeolocation();
   if (!BackgroundGeolocation) return false;
 
@@ -387,6 +408,7 @@ function registerNativeHeadlessTask() {
 
 function loadNativeBackgroundGeolocation() {
   if (Platform.OS === "web") return null;
+  if (isDebugBuild()) return null;
   if (nativeBackgroundGeolocation !== undefined) return nativeBackgroundGeolocation;
 
   try {
@@ -397,6 +419,10 @@ function loadNativeBackgroundGeolocation() {
   }
 
   return nativeBackgroundGeolocation;
+}
+
+function isDebugBuild() {
+  return typeof __DEV__ !== "undefined" && __DEV__;
 }
 
 registerNativeHeadlessTask();

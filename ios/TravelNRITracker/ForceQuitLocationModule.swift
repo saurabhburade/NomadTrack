@@ -127,7 +127,7 @@ final class ForceQuitLocationService: NSObject, CLLocationManagerDelegate {
       content.body = body
 
       let request = UNNotificationRequest(
-        identifier: "nomadtrack-status-\(UUID().uuidString)",
+        identifier: "nomadtrack-status-location",
         content: content,
         trigger: nil
       )
