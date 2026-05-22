@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, Share as NativeShare, StyleSheet, Switch, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Alert, AppState, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share as NativeShare, StyleSheet, Switch, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import {
@@ -23,7 +23,7 @@ import { Text } from "../components/ui/text";
 import { distributionColors, getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import { compactNumber, formatRelativeTime } from "../lib/utils";
 import { formatResidencyYearLabel, getResidencyYearDayCount } from "../services/calculations/residencyYear";
-import { captureManualLocation, startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
+import { captureAutomaticLocationNow, captureManualLocation, hasBackgroundTrackingPermission, startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 import type { TrackingIntervalHours } from "../types/models";
 import type { RootTabParamList } from "../navigation/AppNavigator";
@@ -36,7 +36,12 @@ export function DashboardScreen() {
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
   const [shareAfterQuickMenuClose, setShareAfterQuickMenuClose] = useState(false);
   const [isYearSelectorOpen, setIsYearSelectorOpen] = useState(false);
+  const [isAutomationGuideOpen, setIsAutomationGuideOpen] = useState(false);
   const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
+  const [isAutoTrackStarting, setIsAutoTrackStarting] = useState(false);
+  const [pendingAutoTrackEnable, setPendingAutoTrackEnable] = useState(false);
+  const [hasAlwaysLocationPermission, setHasAlwaysLocationPermission] = useState(false);
+  const autoTrackStartInFlight = useRef(false);
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
@@ -49,7 +54,11 @@ export function DashboardScreen() {
   const otherDays = Math.max(0, summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0));
   const fiscalYearLabel = formatResidencyYearLabel(settings.residencyYearEnd, settings.calendarYearMode);
   const currentLocation = summary.currentLocation;
-  const autoTrackEnabled = !settings.trackingPaused && settings.trackingInterval !== "manual";
+  const autoTrackEnabled = isAutoTrackStarting || (hasAlwaysLocationPermission && !settings.trackingPaused && settings.trackingInterval !== "manual");
+  const shortcutsAutomationStatus = useMemo(
+    () => getShortcutsAutomationStatus(settings.shortcutsAutomationClaimedAt, settings.shortcutsAutomationLastVerifiedAt),
+    [settings.shortcutsAutomationClaimedAt, settings.shortcutsAutomationLastVerifiedAt]
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -57,6 +66,70 @@ export function DashboardScreen() {
     }, 60_000);
     return () => clearInterval(timer);
   }, [runGeocodeQueue]);
+
+  const completeAutoTrackEnable = useCallback(
+    async (interval: Exclude<TrackingIntervalHours, "manual">) => {
+      if (autoTrackStartInFlight.current) return false;
+
+      autoTrackStartInFlight.current = true;
+      setIsAutoTrackStarting(true);
+      try {
+        const started = await startBackgroundTracking(interval);
+        setHasAlwaysLocationPermission(started);
+        if (!started) return false;
+
+        await updateSetting("trackingPaused", false);
+        setPendingAutoTrackEnable(false);
+
+        try {
+          await captureAutomaticLocationNow();
+        } catch (error) {
+          console.warn(`[location] Immediate auto-track capture failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        await refresh();
+        return true;
+      } finally {
+        autoTrackStartInFlight.current = false;
+        setIsAutoTrackStarting(false);
+      }
+    },
+    [refresh, updateSetting]
+  );
+
+  const refreshLocationPermissionState = useCallback(async () => {
+    try {
+      const allowed = await hasBackgroundTrackingPermission();
+      setHasAlwaysLocationPermission(allowed);
+
+      if (allowed && pendingAutoTrackEnable && settings.trackingInterval !== "manual") {
+        await completeAutoTrackEnable(settings.trackingInterval);
+        return;
+      }
+
+      if (!allowed && !settings.trackingPaused && settings.trackingInterval !== "manual") {
+        await updateSetting("trackingPaused", true);
+        await stopBackgroundTracking();
+      }
+    } catch (error) {
+      setHasAlwaysLocationPermission(false);
+      console.warn(`[location] Permission check failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [completeAutoTrackEnable, pendingAutoTrackEnable, settings.trackingInterval, settings.trackingPaused, updateSetting]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshLocationPermissionState();
+    }, [refreshLocationPermissionState])
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshLocationPermissionState();
+    });
+
+    return () => subscription.remove();
+  }, [refreshLocationPermissionState]);
 
   async function saveResidencyYear(year: number, calendarYearMode: boolean) {
     await updateSetting("residencyYearEnd", Math.max(2000, Math.min(2100, year)));
@@ -68,7 +141,7 @@ export function DashboardScreen() {
 
   function shareSummary() {
     void NativeShare.share({
-      title: "Travel NRI Tracker",
+      title: "NomadTrack",
       message: `${fiscalYearLabel}: ${summary.indiaDays} India days, ${summary.outsideIndiaDays} days abroad.`
     }).catch((error) => {
       Alert.alert("Share failed", error instanceof Error ? error.message : "Could not open the share sheet.");
@@ -93,9 +166,17 @@ export function DashboardScreen() {
       if (settings.trackingInterval === "manual") {
         await updateSetting("trackingInterval", interval);
       }
-      await updateSetting("trackingPaused", false);
-      await startBackgroundTracking(interval);
+
+      setPendingAutoTrackEnable(true);
+      const started = await completeAutoTrackEnable(interval);
+      if (!started) {
+        await updateSetting("trackingPaused", true);
+        Alert.alert("Always location required", "Allow location access always to use Auto Track Location. The app will turn this on when you return after granting permission.");
+        return;
+      }
     } else {
+      setPendingAutoTrackEnable(false);
+      setHasAlwaysLocationPermission(false);
       await updateSetting("trackingPaused", true);
       await stopBackgroundTracking();
     }
@@ -114,6 +195,32 @@ export function DashboardScreen() {
     } finally {
       setIsRefreshingLocation(false);
     }
+  }
+
+  function showAutomationSetup() {
+    if (Platform.OS !== "ios") {
+      Alert.alert("iOS only", "Shortcuts automations are available on iPhone.");
+      return;
+    }
+
+    setIsAutomationGuideOpen(true);
+  }
+
+  async function openShortcutsAutomationSetup() {
+    try {
+      await Linking.openURL("shortcuts://create-automation");
+    } catch {
+      try {
+        await Linking.openURL("shortcuts://");
+      } catch (error) {
+        Alert.alert("Could not open Shortcuts", error instanceof Error ? error.message : "Open the Shortcuts app manually and create the automations.");
+      }
+    }
+  }
+
+  async function confirmShortcutsAutomationSetup() {
+    await updateSetting("shortcutsAutomationClaimedAt", new Date().toISOString());
+    setIsAutomationGuideOpen(false);
   }
 
   return (
@@ -176,6 +283,7 @@ export function DashboardScreen() {
             <View style={styles.autoTrackControls}>
               <Switch
                 value={autoTrackEnabled}
+                disabled={isAutoTrackStarting}
                 onValueChange={(value) => void setAutoTrackLocation(value)}
                 trackColor={{ false: palette.switchOff, true: palette.success }}
                 thumbColor={palette.switchThumb}
@@ -202,6 +310,28 @@ export function DashboardScreen() {
               {currentLocation?.city ? `${currentLocation.city}, ` : ""}
               {currentLocation?.countryName ?? "Pending first location"}
             </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create Log Country Shortcuts automations"
+            style={[styles.automationButton, { backgroundColor: palette.pill, borderColor: palette.border }]}
+            onPress={showAutomationSetup}
+          >
+            <Clock3 size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+            <Text className="flex-1 text-sm font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
+              Create 1 AM + 1 PM Automations
+            </Text>
+          </Pressable>
+          <View style={[styles.automationStatusRow, { backgroundColor: palette.pill }]}>
+            <View style={[styles.automationStatusDot, { backgroundColor: getShortcutsAutomationStatusColor(shortcutsAutomationStatus.state, palette) }]} />
+            <View className="flex-1">
+              <Text className="text-xs font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
+                {shortcutsAutomationStatus.title}
+              </Text>
+              <Text className="text-[11px]" numberOfLines={2} style={{ color: palette.muted }}>
+                {shortcutsAutomationStatus.detail}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -271,6 +401,16 @@ export function DashboardScreen() {
           setIsYearSelectorOpen(false);
           void saveResidencyYear(year, calendarYearMode);
         }}
+      />
+      <AutomationGuideDrawer
+        palette={palette}
+        visible={isAutomationGuideOpen}
+        onClose={() => setIsAutomationGuideOpen(false)}
+        onOpenShortcuts={() => {
+          setIsAutomationGuideOpen(false);
+          void openShortcutsAutomationSetup();
+        }}
+        onConfirmSetup={() => void confirmShortcutsAutomationSetup()}
       />
     </ScrollView>
   );
@@ -459,6 +599,129 @@ function MenuActionRow({ icon: Icon, label, palette, onPress }: { icon: MenuIcon
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function AutomationGuideDrawer({
+  palette,
+  visible,
+  onClose,
+  onOpenShortcuts,
+  onConfirmSetup
+}: {
+  palette: Palette;
+  visible: boolean;
+  onClose: () => void;
+  onOpenShortcuts: () => void;
+  onConfirmSetup: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const automationTimes = ["1:00 AM", "1:00 PM"];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <GlassBlurLayer tint={palette.blurTint} intensity={14} style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View
+          style={[
+            styles.automationDrawer,
+            {
+              backgroundColor: palette.menuGlassFill,
+              borderColor: palette.glassBorder,
+              paddingBottom: Math.max(insets.bottom, 14) + 10,
+              shadowColor: palette.glassShadow
+            }
+          ]}
+        >
+          <View style={[styles.drawerHandle, { backgroundColor: palette.glassBorderActive }]} />
+          <View className="flex-row items-center gap-3 px-5 pt-5">
+            <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: palette.pill }}>
+              <Clock3 size={20} color={palette.accent} strokeWidth={iconStrokeWidth} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold" style={{ color: palette.foreground }}>
+                Log Country automations
+              </Text>
+              <Text className="text-xs" style={{ color: palette.muted }} numberOfLines={1}>
+                Create both daily schedules in Shortcuts
+              </Text>
+            </View>
+          </View>
+
+          <View className="mx-5 mt-5 gap-3">
+            {automationTimes.map((time, index) => (
+              <AutomationStepCard key={time} index={index + 1} time={time} palette={palette} />
+            ))}
+          </View>
+
+          <View className="mx-5 mt-5 gap-2 rounded-2xl px-4 py-3" style={{ backgroundColor: palette.pill }}>
+            <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+              For each automation
+            </Text>
+            <StepLine value="Choose Time of Day, set Daily, then tap Next." palette={palette} />
+            <StepLine value="Add action: NomadTrack -> Log Country." palette={palette} />
+            <StepLine value="Set Run Immediately, then tap Done." palette={palette} />
+          </View>
+
+          <Pressable accessibilityRole="button" accessibilityLabel="Confirm both Log Country automations were created" className="mx-5 mt-5 h-12 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={onConfirmSetup}>
+            <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
+              I created both automations
+            </Text>
+          </Pressable>
+
+          <View className="mx-5 mt-3 flex-row gap-3">
+            <Pressable accessibilityRole="button" accessibilityLabel="Close automation setup steps" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
+              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                Close
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open Shortcuts automation setup" className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={onOpenShortcuts}>
+              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
+                Open Shortcuts
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function AutomationStepCard({ index, time, palette }: { index: number; time: string; palette: Palette }) {
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl px-4 py-3" style={{ backgroundColor: palette.pill }}>
+      <View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: palette.card }}>
+        <Text className="text-sm font-extrabold" style={{ color: palette.foreground }}>
+          {index}
+        </Text>
+      </View>
+      <View className="flex-1">
+        <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+          Time of Day
+        </Text>
+        <Text className="text-xs" style={{ color: palette.muted }}>
+          Daily at {time}
+        </Text>
+      </View>
+      <Text className="text-xs font-bold" style={{ color: palette.accent }}>
+        Log Country
+      </Text>
+    </View>
+  );
+}
+
+function StepLine({ value, palette }: { value: string; palette: Palette }) {
+  return (
+    <View className="flex-row gap-2">
+      <Text className="text-xs font-bold" style={{ color: palette.accent }}>
+        -
+      </Text>
+      <Text className="flex-1 text-xs" style={{ color: palette.muted }}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -741,6 +1004,110 @@ function getDistributionColor(index: number, palette: Palette) {
   return distributionColors[index] ?? palette.accent;
 }
 
+type ShortcutsAutomationState = "unknown" | "claimed" | "verified" | "missing";
+type ShortcutsAutomationStatus = {
+  state: ShortcutsAutomationState;
+  title: string;
+  detail: string;
+};
+
+const SHORTCUTS_AUTOMATION_HOURS = [1, 13] as const;
+const SHORTCUTS_AUTOMATION_GRACE_MS = 45 * 60 * 1000;
+
+function getShortcutsAutomationStatus(claimedAtIso?: string, verifiedAtIso?: string): ShortcutsAutomationStatus {
+  const claimedAt = parseOptionalDate(claimedAtIso);
+  const verifiedAt = parseOptionalDate(verifiedAtIso);
+
+  if (!claimedAt) {
+    return {
+      state: "unknown",
+      title: "Shortcuts backup not confirmed",
+      detail: "Create the 1 AM and 1 PM Log Country automations."
+    };
+  }
+
+  const now = new Date();
+  const latestExpectedRun = getLatestExpectedShortcutRun(claimedAt, now);
+  const nextExpectedRun = getNextExpectedShortcutRun(now);
+  const hasVerifiedAfterClaim = Boolean(verifiedAt && verifiedAt.getTime() >= claimedAt.getTime());
+
+  if (hasVerifiedAfterClaim && (!latestExpectedRun || verifiedAt!.getTime() >= latestExpectedRun.getTime())) {
+    return {
+      state: "verified",
+      title: "Shortcuts verified",
+      detail: `Last Log Country run ${formatRelativeTime(verifiedAtIso)}. Next check ${formatShortcutRunTime(nextExpectedRun)}.`
+    };
+  }
+
+  if (latestExpectedRun) {
+    return {
+      state: "missing",
+      title: "Shortcut run missing",
+      detail: `No Log Country run after ${formatShortcutRunTime(latestExpectedRun)}. Check both automations in Shortcuts.`
+    };
+  }
+
+  return {
+    state: "claimed",
+    title: "Setup claimed",
+    detail: `Waiting for the first scheduled Log Country run. Next check ${formatShortcutRunTime(nextExpectedRun)}.`
+  };
+}
+
+function parseOptionalDate(iso?: string) {
+  if (!iso) return undefined;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function getLatestExpectedShortcutRun(claimedAt: Date, now: Date) {
+  const dueThreshold = new Date(now.getTime() - SHORTCUTS_AUTOMATION_GRACE_MS);
+
+  for (let dayOffset = 0; dayOffset < 3; dayOffset += 1) {
+    const day = new Date(dueThreshold);
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - dayOffset);
+
+    for (const hour of [...SHORTCUTS_AUTOMATION_HOURS].reverse()) {
+      const candidate = new Date(day);
+      candidate.setHours(hour, 0, 0, 0);
+      if (candidate.getTime() <= dueThreshold.getTime() && candidate.getTime() > claimedAt.getTime()) {
+        return candidate;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function getNextExpectedShortcutRun(now: Date) {
+  for (const hour of SHORTCUTS_AUTOMATION_HOURS) {
+    const candidate = new Date(now);
+    candidate.setHours(hour, 0, 0, 0);
+    if (candidate.getTime() > now.getTime()) return candidate;
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(SHORTCUTS_AUTOMATION_HOURS[0], 0, 0, 0);
+  return tomorrow;
+}
+
+function formatShortcutRunTime(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function getShortcutsAutomationStatusColor(state: ShortcutsAutomationState, palette: Palette) {
+  if (state === "verified") return palette.success;
+  if (state === "missing") return palette.warning;
+  if (state === "claimed") return palette.accent;
+  return palette.muted;
+}
+
 function flagForCountry(countryCode: string) {
   if (countryCode.length !== 2) return countryCode;
   const codePoints = countryCode
@@ -891,6 +1258,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
+  automationButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    height: 42,
+    justifyContent: "center",
+    marginTop: 2,
+    paddingHorizontal: 14
+  },
+  automationStatusRow: {
+    alignItems: "center",
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  automationStatusDot: {
+    borderRadius: 999,
+    height: 9,
+    width: 9
+  },
   autoTrackTitle: {
     flexShrink: 1,
     fontFamily: "Inter_700Bold",
@@ -934,6 +1325,21 @@ const styles = StyleSheet.create({
     left: 0,
     overflow: "hidden",
     paddingTop: 8,
+    position: "absolute",
+    right: 0,
+    shadowOffset: { width: 0, height: -18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 34
+  },
+  automationDrawer: {
+    borderCurve: "continuous",
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    borderWidth: 1,
+    bottom: 0,
+    left: 0,
+    overflow: "hidden",
+    paddingTop: 12,
     position: "absolute",
     right: 0,
     shadowOffset: { width: 0, height: -18 },

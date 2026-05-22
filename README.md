@@ -1,4 +1,4 @@
-# Travel NRI Tracker
+# NomadTrack
 
 Privacy-first React Native app for automatic travel history, India fiscal-year day counts, country totals, calendar/map views, CSV export, and Google Drive AppData backup. It is local-first: SQLite is the source of truth and there is no custom backend.
 

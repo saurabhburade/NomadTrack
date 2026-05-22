@@ -1,20 +1,23 @@
 {
   "expo": {
-    "name": "Travel NRI Tracker",
+    "name": "NomadTrack",
     "slug": "travel-nri-tracker",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/nomadtrack-icon.png",
     "scheme": [
+      "exp+travel-nri-tracker",
       "travelnritracker",
       "com.googleusercontent.apps.564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i"
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "icon": "./assets/nomadtrack-icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.local.travelnritracker",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Travel NRI Tracker uses your location to build your private travel history and country day counts.",
+        "NSLocationWhenInUseUsageDescription": "NomadTrack uses your location to build your private travel history and country day counts.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Background location lets the app update your travel history while you are moving.",
         "NSLocationAlwaysUsageDescription": "Background location lets the app update your travel history while you are moving.",
         "NSPhotoLibraryUsageDescription": "Photo access is used only when you choose to import travel history from photo metadata."
@@ -22,6 +25,10 @@
     },
     "android": {
       "package": "com.local.travelnritracker",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/nomadtrack-icon.png",
+        "backgroundColor": "#000000"
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -39,7 +46,29 @@
           "launchMode": "launcher"
         }
       ],
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "Allow NomadTrack to update your travel history in the background.",
+          "locationAlwaysPermission": "Allow NomadTrack to update your travel history in the background.",
+          "locationWhenInUsePermission": "NomadTrack uses your location to build your private travel history and country day counts."
+        }
+      ],
+      [
+        "react-native-background-geolocation",
+        {}
+      ],
+      [
+        "expo-gradle-ext-vars",
+        {
+          "googlePlayServicesLocationVersion": "21.3.0",
+          "tslocationmanagerVersion": "4.0.+"
+        }
+      ],
+      "expo-background-task",
       "expo-secure-store",
       "expo-sqlite",
       "expo-web-browser",

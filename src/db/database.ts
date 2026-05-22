@@ -5,8 +5,10 @@ import { getResidencyYearWindow } from "../services/calculations/residencyYear";
 import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | undefined;
+let dbWriteQueue: Promise<void> = Promise.resolve();
 const currentYear = new Date().getUTCFullYear();
 const maxManualEntryDays = 3660;
+const manualTripNotes = ["Manual history entry", "Manual day correction"];
 
 export const defaultSettings: AppSettings = {
   trackingInterval: 4,
@@ -18,15 +20,31 @@ export const defaultSettings: AppSettings = {
   calendarYearMode: false,
   dayCountingRule: "longest_duration",
   autoBackup: true,
+  autoBackupFrequency: "daily",
   wifiOnlyBackup: true,
   appearance: "system",
   cloudBackupEnabled: true,
-  onboardingCompleted: false
+  onboardingCompleted: false,
+  shortcutsAutomationClaimedAt: undefined,
+  shortcutsAutomationLastVerifiedAt: undefined
 };
 
 export async function getDb() {
   dbPromise ??= openConfiguredDatabase();
   return dbPromise;
+}
+
+export async function runDbWriteTransaction(task: (transactionDb: SQLite.SQLiteDatabase) => Promise<void>) {
+  const run = async () => {
+    const db = await getDb();
+    await db.withExclusiveTransactionAsync(async (transactionDb) => {
+      await task(transactionDb as unknown as SQLite.SQLiteDatabase);
+    });
+  };
+
+  const queued = dbWriteQueue.then(run, run);
+  dbWriteQueue = queued.catch(() => undefined);
+  await queued;
 }
 
 async function openConfiguredDatabase() {
@@ -71,32 +89,50 @@ export async function writeSetting<K extends keyof AppSettings>(key: K, value: A
   );
 }
 
-export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt" | "updatedAt">) {
+export async function hasLocalTravelData() {
   const db = await getDb();
-  const now = new Date().toISOString();
-  await db.runAsync(
-    `INSERT OR REPLACE INTO location_points (
-      id, timestamp, latitude, longitude, accuracy, altitude, speed, heading, timezone,
-      country_code, country_name, region, city, source, reverse_geocode_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    point.id,
-    point.timestamp,
-    point.latitude,
-    point.longitude,
-    point.accuracy,
-    point.altitude ?? null,
-    point.speed ?? null,
-    point.heading ?? null,
-    point.timezone ?? null,
-    point.countryCode ?? null,
-    point.countryName ?? null,
-    point.region ?? null,
-    point.city ?? null,
-    point.source,
-    point.reverseGeocodeStatus,
-    now,
-    now
+  const result = await db.getFirstAsync<{ count: number }>(
+    `SELECT
+      (SELECT COUNT(*) FROM location_points) +
+      (SELECT COUNT(*) FROM day_records) +
+      (SELECT COUNT(*) FROM trips) as count`
   );
+  return (result?.count ?? 0) > 0;
+}
+
+export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt" | "updatedAt">) {
+  const now = new Date().toISOString();
+  const date = point.timestamp.slice(0, 10);
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      "DELETE FROM location_points WHERE timestamp >= ? AND timestamp <= ?",
+      `${date}T00:00:00.000Z`,
+      `${date}T23:59:59.999Z`
+    );
+    await db.runAsync(
+      `INSERT INTO location_points (
+        id, timestamp, latitude, longitude, accuracy, altitude, speed, heading, timezone,
+        country_code, country_name, region, city, source, reverse_geocode_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      point.id,
+      point.timestamp,
+      point.latitude,
+      point.longitude,
+      point.accuracy,
+      point.altitude ?? null,
+      point.speed ?? null,
+      point.heading ?? null,
+      point.timezone ?? null,
+      point.countryCode ?? null,
+      point.countryName ?? null,
+      point.region ?? null,
+      point.city ?? null,
+      point.source,
+      point.reverseGeocodeStatus,
+      now,
+      now
+    );
+  });
 }
 
 export async function enqueueGeocodeJob(point: Pick<LocationPoint, "id" | "latitude" | "longitude" | "timestamp">) {
@@ -147,7 +183,7 @@ export async function updateLocationGeocode(
   const db = await getDb();
   await db.runAsync(
     `UPDATE location_points SET
-      country_code = ?, country_name = ?, region = ?, city = ?, timezone = ?,
+      country_code = ?, country_name = ?, region = ?, city = ?, timezone = COALESCE(?, timezone),
       reverse_geocode_status = 'done', updated_at = ?
      WHERE id = ?`,
     result.countryCode ?? null,
@@ -258,12 +294,11 @@ export async function insertManualTravelEntry(entry: {
   countryCode: string;
   countryName: string;
 }) {
-  const db = await getDb();
   const now = new Date().toISOString();
   const tripId = uuid("trip");
   const dates = enumerateIsoDates(entry.startDate, entry.endDate);
 
-  await db.withTransactionAsync(async () => {
+  await runDbWriteTransaction(async (db) => {
     await db.runAsync(
       `INSERT INTO trips (
         id, start_date, end_date, country_code, country_name, cities, notes, is_ghost, created_at, updated_at
@@ -321,6 +356,75 @@ export async function insertManualTravelEntry(entry: {
   return tripId;
 }
 
+export async function updateManualDayEntry(entry: {
+  originalDate: string;
+  date: string;
+  countryCode: string;
+  countryName: string;
+}) {
+  const now = new Date().toISOString();
+  const affectedDates = entry.originalDate === entry.date ? [entry.date] : [entry.originalDate, entry.date];
+
+  await runDbWriteTransaction(async (db) => {
+    for (const date of affectedDates) {
+      await removeManualTripsForDate(db, date, now);
+    }
+
+    if (entry.originalDate !== entry.date) {
+      await db.runAsync("DELETE FROM day_records WHERE date = ? AND is_manual_override = 1", entry.originalDate);
+    }
+
+    await db.runAsync(
+      `INSERT OR REPLACE INTO day_records (
+        date, primary_country_code, primary_country_name, countries_visited,
+        is_travel_day, is_pending_validation, is_manual_override, notes, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, 0, 0, 1, ?,
+        COALESCE((SELECT created_at FROM day_records WHERE date = ?), ?),
+        ?
+      )`,
+      entry.date,
+      entry.countryCode,
+      entry.countryName,
+      JSON.stringify([entry.countryCode]),
+      "Manual day correction",
+      entry.date,
+      now,
+      now
+    );
+
+    await db.runAsync("DELETE FROM day_country_segments WHERE date = ?", entry.date);
+    await db.runAsync(
+      `INSERT INTO day_country_segments (
+        id, date, country_code, country_name, start_time, end_time, source,
+        confidence, is_pending_validation, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'manual', 1, 0, ?, ?)`,
+      uuid("seg"),
+      entry.date,
+      entry.countryCode,
+      entry.countryName,
+      `${entry.date}T00:00:00.000Z`,
+      `${entry.date}T23:59:59.999Z`,
+      now,
+      now
+    );
+
+    await db.runAsync(
+      `INSERT INTO trips (
+        id, start_date, end_date, country_code, country_name, cities, notes, is_ghost, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, '[]', ?, 0, ?, ?)`,
+      uuid("trip"),
+      entry.date,
+      entry.date,
+      entry.countryCode,
+      entry.countryName,
+      "Manual day correction",
+      now,
+      now
+    );
+  });
+}
+
 export async function readDayRecordsForMonth(monthStartIso: string) {
   const db = await getDb();
   const start = monthStartIso.slice(0, 8) + "01";
@@ -331,6 +435,57 @@ export async function readDayRecordsForMonth(monthStartIso: string) {
     start,
     end.toISOString().slice(0, 10)
   );
+}
+
+async function removeManualTripsForDate(db: SQLite.SQLiteDatabase, date: string, now: string) {
+  const trips = await db.getAllAsync<TripRow>(
+    `SELECT * FROM trips
+     WHERE start_date <= ?
+       AND end_date >= ?
+       AND notes IN (${manualTripNotes.map(() => "?").join(", ")})`,
+    date,
+    date,
+    ...manualTripNotes
+  );
+
+  for (const trip of trips) {
+    if (trip.start_date === date && trip.end_date === date) {
+      await db.runAsync("DELETE FROM trips WHERE id = ?", trip.id);
+      continue;
+    }
+
+    if (trip.start_date === date) {
+      await db.runAsync("UPDATE trips SET start_date = ?, updated_at = ? WHERE id = ?", addIsoDays(date, 1), now, trip.id);
+      continue;
+    }
+
+    if (trip.end_date === date) {
+      await db.runAsync("UPDATE trips SET end_date = ?, updated_at = ? WHERE id = ?", addIsoDays(date, -1), now, trip.id);
+      continue;
+    }
+
+    await db.runAsync("UPDATE trips SET end_date = ?, updated_at = ? WHERE id = ?", addIsoDays(date, -1), now, trip.id);
+    await db.runAsync(
+      `INSERT INTO trips (
+        id, start_date, end_date, country_code, country_name, cities, notes, is_ghost, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      uuid("trip"),
+      addIsoDays(date, 1),
+      trip.end_date,
+      trip.country_code,
+      trip.country_name,
+      trip.cities,
+      trip.notes,
+      now,
+      now
+    );
+  }
+}
+
+function addIsoDays(date: string, days: number) {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
 }
 
 function enumerateIsoDates(startDate: string, endDate: string) {

@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Travel NRI Tracker</string>
+    <string>NomadTrack</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -54,6 +54,10 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+      <string>com.expo.modules.backgroundtask.processing</string>
+    </array>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -61,7 +65,7 @@
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Background location lets the app update your travel history while you are moving.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Travel NRI Tracker uses your location to build your private travel history and country day counts.</string>
+    <string>NomadTrack uses your location to build your private travel history and country day counts.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to save photos</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -71,6 +75,8 @@
     <key>UIBackgroundModes</key>
     <array>
       <string>fetch</string>
+      <string>location</string>
+      <string>processing</string>
     </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>

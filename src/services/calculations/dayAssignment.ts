@@ -1,5 +1,5 @@
 import { formatISO } from "date-fns";
-import { getDb } from "../../db/database";
+import { runDbWriteTransaction } from "../../db/database";
 import { toIsoDate, uuid } from "../../lib/utils";
 import type { AppSettings, DayCountrySegment, LocationPoint } from "../../types/models";
 
@@ -44,7 +44,6 @@ export function choosePrimaryCountry(segments: DayCountrySegment[], settings: Ap
 
 export async function recalculateDayForPoints(points: LocationPoint[], settings: AppSettings) {
   if (points.length === 0) return;
-  const db = await getDb();
   const date = toIsoDate(points[0]!.timestamp);
   const now = formatISO(new Date());
   const segments = buildSegmentsForDay(points);
@@ -53,7 +52,7 @@ export async function recalculateDayForPoints(points: LocationPoint[], settings:
   const isTravelDay = countriesVisited.length > 1;
   const isPending = segments.some((segment) => segment.isPendingValidation);
 
-  await db.withTransactionAsync(async () => {
+  await runDbWriteTransaction(async (db) => {
     await db.runAsync(
       `INSERT OR REPLACE INTO day_records (
         date, primary_country_code, primary_country_name, countries_visited,

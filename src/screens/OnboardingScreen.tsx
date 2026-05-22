@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, View } from "react-native";
+import { Alert, Animated, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { ChevronRight } from "lucide-react-native";
 import { Button } from "../components/ui/button";
 import { Text } from "../components/ui/text";
+import { NomadTrackLogo } from "../components/brand/NomadTrackLogo";
+import { hasLocalTravelData } from "../db/database";
 import { iconStrokeWidth } from "../lib/colors";
+import { listDriveBackups, restoreLatestDriveBackup } from "../services/backup/driveBackup";
 import { getGoogleDriveAuthSetup, storeGoogleTokenResponse, useGoogleDriveAuthRequest } from "../services/auth/googleAuth";
 import { useAppStore } from "../store/appStore";
 
 export function OnboardingScreen() {
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [restoreState, setRestoreState] = useState<"idle" | "checking" | "available" | "restoring">("idle");
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const updateSetting = useAppStore((state) => state.updateSetting);
+  const refresh = useAppStore((state) => state.refresh);
+  const setSelectedDate = useAppStore((state) => state.setSelectedDate);
   const [googleAuthRequest, response, promptAsync] = useGoogleDriveAuthRequest();
   const googleAuthSetup = useMemo(() => getGoogleDriveAuthSetup(), []);
 
@@ -27,18 +34,73 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (response?.type === "success" && response.authentication?.accessToken) {
       void storeGoogleTokenResponse(response.authentication)
-        .then(() => updateSetting("onboardingCompleted", true))
-        .finally(() => setIsSigningIn(false));
+        .then(() => checkForRestorableBackup())
+        .catch((error) => {
+          Alert.alert("Google login failed", error instanceof Error ? error.message : "Could not connect Google Drive.");
+          setIsSigningIn(false);
+        });
       return;
     }
 
     if (response && response.type !== "success") {
       setIsSigningIn(false);
     }
-  }, [response, updateSetting]);
+  }, [response]);
+
+  async function finishOnboarding() {
+    await updateSetting("onboardingCompleted", true);
+    await refresh();
+  }
+
+  async function checkForRestorableBackup() {
+    setRestoreState("checking");
+    setRestoreMessage("Checking Google Drive for backups...");
+
+    try {
+      if (await hasLocalTravelData()) {
+        await finishOnboarding();
+        return;
+      }
+
+      const result = await listDriveBackups();
+      const latest = result.files.sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime))[0];
+      if (!latest) {
+        await finishOnboarding();
+        return;
+      }
+
+      setRestoreState("available");
+      setRestoreMessage(`Found a ${latest.year ?? "Drive"} backup from ${formatOnboardingBackupTime(latest.modifiedTime)}.`);
+    } catch (error) {
+      setRestoreState("idle");
+      setRestoreMessage(null);
+      Alert.alert("Backup check failed", error instanceof Error ? error.message : "Could not check Google Drive backups.");
+      await finishOnboarding();
+    } finally {
+      setIsSigningIn(false);
+    }
+  }
+
+  async function restoreBackupAndContinue() {
+    setRestoreState("restoring");
+    setRestoreMessage("Restoring your Google Drive backup...");
+
+    try {
+      const result = await restoreLatestDriveBackup();
+      await setSelectedDate(result.displayDate);
+      await finishOnboarding();
+    } catch (error) {
+      setRestoreState("available");
+      Alert.alert("Restore failed", error instanceof Error ? error.message : "Could not restore the Google Drive backup.");
+    }
+  }
+
+  function skipRestoreAndContinue() {
+    void finishOnboarding();
+  }
 
   function completeWithoutGoogle() {
-    void updateSetting("onboardingCompleted", true);
+    void finishOnboarding();
   }
 
   function handleGetStarted() {
@@ -60,6 +122,13 @@ export function OnboardingScreen() {
 
         <View className="-mt-20 flex-1 justify-end rounded-t-[46px] bg-white px-8 pb-10 pt-14">
           <View className="items-center gap-8">
+            <View className="items-center gap-3">
+              <View className="overflow-hidden rounded-[22px]">
+                <NomadTrackLogo size={84} />
+              </View>
+              <Text className="text-center text-3xl font-extrabold text-[#0a0a0a]">NomadTrack</Text>
+            </View>
+
             <Text className="max-w-[310px] text-center text-2xl font-extrabold leading-[32px] text-[#0a0a0a]">
               One App for{"\n"}All Your Travel{"\n"}
               <Text className="text-2xl font-extrabold leading-[32px] text-[#6b6b6b]">Records</Text>
@@ -67,17 +136,47 @@ export function OnboardingScreen() {
 
             <Button
               className="h-16 w-full justify-between rounded-full border-[#0a0a0a] bg-[#0a0a0a] px-7"
-              disabled={isSigningIn}
+              disabled={isSigningIn || restoreState === "checking" || restoreState === "restoring"}
               onPress={handleGetStarted}
             >
-              <Text className="text-sm font-bold text-white">{isSigningIn ? "Connecting..." : "Get Started"}</Text>
+              <Text className="text-sm font-bold text-white">{getPrimaryButtonLabel(isSigningIn, restoreState)}</Text>
               <ChevronRight size={25} color="#fff" strokeWidth={iconStrokeWidth} />
             </Button>
+            {restoreState === "available" ? (
+              <View className="w-full gap-3">
+                <Text className="text-center text-sm font-semibold leading-5 text-[#525252]">{restoreMessage}</Text>
+                <Button className="h-14 rounded-full border-[#0a0a0a] bg-[#0a0a0a]" onPress={restoreBackupAndContinue}>
+                  <Text className="text-sm font-bold text-white">Restore Backup</Text>
+                </Button>
+                <Button className="h-12 rounded-full border-[#d4d4d4] bg-white" variant="outline" onPress={skipRestoreAndContinue}>
+                  <Text className="text-sm font-bold text-[#0a0a0a]">Continue Without Restore</Text>
+                </Button>
+              </View>
+            ) : restoreMessage ? (
+              <Text className="text-center text-sm font-semibold leading-5 text-[#525252]">{restoreMessage}</Text>
+            ) : null}
           </View>
         </View>
       </Animated.View>
     </SafeAreaView>
   );
+}
+
+function getPrimaryButtonLabel(isSigningIn: boolean, restoreState: "idle" | "checking" | "available" | "restoring") {
+  if (restoreState === "checking") return "Checking Backup...";
+  if (restoreState === "restoring") return "Restoring...";
+  if (isSigningIn) return "Connecting...";
+  return "Get Started";
+}
+
+function formatOnboardingBackupTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function GradientScene() {

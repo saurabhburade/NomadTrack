@@ -8,6 +8,7 @@ const DAY_RECORDS_KEY = "travel-nri-tracker.dayRecords";
 const TRIPS_KEY = "travel-nri-tracker.trips";
 const currentYear = new Date().getUTCFullYear();
 const maxManualEntryDays = 3660;
+const manualTripNotes = new Set(["Manual history entry", "Manual day correction"]);
 
 export const defaultSettings: AppSettings = {
   trackingInterval: 4,
@@ -19,10 +20,13 @@ export const defaultSettings: AppSettings = {
   calendarYearMode: false,
   dayCountingRule: "longest_duration",
   autoBackup: true,
+  autoBackupFrequency: "daily",
   wifiOnlyBackup: true,
   appearance: "system",
   cloudBackupEnabled: true,
-  onboardingCompleted: false
+  onboardingCompleted: false,
+  shortcutsAutomationClaimedAt: undefined,
+  shortcutsAutomationLastVerifiedAt: undefined
 };
 
 export async function getDb() {
@@ -33,6 +37,11 @@ export async function getDb() {
     getFirstAsync: async () => null,
     withTransactionAsync: async (callback: () => Promise<void>) => callback()
   };
+}
+
+export async function runDbWriteTransaction(callback: (db: Awaited<ReturnType<typeof getDb>>) => Promise<void>) {
+  const db = await getDb();
+  await callback(db);
 }
 
 export async function readSettings(): Promise<AppSettings> {
@@ -46,9 +55,14 @@ export async function writeSetting<K extends keyof AppSettings>(key: K, value: A
   globalThis.localStorage?.setItem(SETTINGS_KEY, JSON.stringify(next));
 }
 
+export async function hasLocalTravelData() {
+  return readStoredPoints().length > 0 || readStoredDayRecords().length > 0 || readStoredTrips().length > 0;
+}
+
 export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt" | "updatedAt">) {
   const now = new Date().toISOString();
-  const points = readStoredPoints().filter((existing) => existing.id !== point.id);
+  const date = point.timestamp.slice(0, 10);
+  const points = readStoredPoints().filter((existing) => existing.timestamp.slice(0, 10) !== date);
   points.push({ ...point, createdAt: now, updatedAt: now });
   globalThis.localStorage?.setItem(POINTS_KEY, JSON.stringify(points));
 }
@@ -207,6 +221,49 @@ export async function insertManualTravelEntry(entry: {
   return trip.id;
 }
 
+export async function updateManualDayEntry(entry: {
+  originalDate: string;
+  date: string;
+  countryCode: string;
+  countryName: string;
+}) {
+  const affectedDates = entry.originalDate === entry.date ? [entry.date] : [entry.originalDate, entry.date];
+  let trips = readStoredTrips();
+
+  for (const date of affectedDates) {
+    trips = removeManualTripsForDate(trips, date);
+  }
+
+  trips.push({
+    id: uuid("trip"),
+    startDate: entry.date,
+    endDate: entry.date,
+    countryCode: entry.countryCode,
+    countryName: entry.countryName,
+    cities: [],
+    notes: "Manual day correction"
+  });
+  globalThis.localStorage?.setItem(TRIPS_KEY, JSON.stringify(trips));
+
+  let records = readStoredDayRecords();
+  if (entry.originalDate !== entry.date) {
+    records = records.filter((record) => record.date !== entry.originalDate || record.is_manual_override !== 1);
+  }
+
+  records = records.filter((record) => record.date !== entry.date);
+  records.push({
+    date: entry.date,
+    primary_country_code: entry.countryCode,
+    primary_country_name: entry.countryName,
+    countries_visited: JSON.stringify([entry.countryCode]),
+    is_travel_day: 0,
+    is_pending_validation: 0,
+    is_manual_override: 1,
+    notes: "Manual day correction"
+  });
+  globalThis.localStorage?.setItem(DAY_RECORDS_KEY, JSON.stringify(records));
+}
+
 export async function readDayRecordsForMonth(monthStartIso: string) {
   const start = monthStartIso.slice(0, 8) + "01";
   const end = new Date(`${start}T00:00:00.000Z`);
@@ -283,6 +340,40 @@ function readStoredDayRecords(): StoredDayRecord[] {
 function readStoredTrips(): Trip[] {
   const raw = globalThis.localStorage?.getItem(TRIPS_KEY);
   return raw ? (JSON.parse(raw) as Trip[]) : [];
+}
+
+function removeManualTripsForDate(trips: Trip[], date: string) {
+  const nextTrips: Trip[] = [];
+
+  for (const trip of trips) {
+    if (trip.startDate > date || trip.endDate < date || !manualTripNotes.has(trip.notes ?? "")) {
+      nextTrips.push(trip);
+      continue;
+    }
+
+    if (trip.startDate < date) {
+      nextTrips.push({
+        ...trip,
+        endDate: addIsoDays(date, -1)
+      });
+    }
+
+    if (trip.endDate > date) {
+      nextTrips.push({
+        ...trip,
+        id: uuid("trip"),
+        startDate: addIsoDays(date, 1)
+      });
+    }
+  }
+
+  return nextTrips;
+}
+
+function addIsoDays(date: string, days: number) {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
 }
 
 function enumerateIsoDates(startDate: string, endDate: string) {

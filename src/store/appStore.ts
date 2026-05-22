@@ -9,9 +9,12 @@ import {
   readLocationPointsForDashboardYear,
   readSettings,
   readTrips,
+  updateManualDayEntry,
   writeSetting
 } from "../db/database";
+import { syncBackgroundBackupRegistration } from "../services/backup/backgroundBackupTask";
 import { processGeocodeQueue } from "../services/geocoding/geocodeQueue";
+import { drainPendingShortcutsLocationEvents, startCoreLocationWakeTriggers, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import type { AppSettings, DashboardSummary, LocationPoint, Trip } from "../types/models";
 
 export type DayRecordPreview = {
@@ -37,6 +40,7 @@ type AppState = {
   refresh: () => Promise<void>;
   setSelectedDate: (date: string) => Promise<void>;
   addManualEntry: (entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) => Promise<void>;
+  updateDayEntry: (entry: { originalDate: string; date: string; countryCode: string; countryName: string }) => Promise<void>;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
   runGeocodeQueue: () => Promise<void>;
 };
@@ -91,6 +95,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const settings = await withTimeout("Settings load", readSettings());
       const isOffline = await readNetworkOfflineState();
       set({ settings, isOffline });
+      await syncBackgroundBackupRegistration(settings);
+      await drainPendingShortcutsLocationEvents();
+      if (!settings.trackingPaused && settings.trackingInterval !== "manual") {
+        await startCoreLocationWakeTriggers({ backupPendingEvents: false, backupShortcutsEvents: true });
+      } else {
+        await stopBackgroundTracking();
+      }
       await withTimeout("Initial refresh", get().refresh());
     } catch (error) {
       console.error(`[startup] Initialization failed: ${getErrorMessage(error)}`);
@@ -100,7 +111,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   refresh: async () => {
-    const [summary, mapPoints, trips, monthRecords, yearRecords] = await Promise.all([
+    const [settings, summary, mapPoints, trips, monthRecords, yearRecords] = await Promise.all([
+      readSettings(),
       readDashboardSummary(),
       readLocationPointsForDashboardYear(),
       readTrips(),
@@ -109,12 +121,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     ]);
     const isOffline = await readNetworkOfflineState();
     set({
+      settings,
       summary,
       mapPoints,
       trips,
       monthRecords: monthRecords as DayRecordPreview[],
       yearRecords: yearRecords as DayRecordPreview[],
       isOffline
+    });
+    void syncBackgroundBackupRegistration(settings).catch((error) => {
+      console.warn(`[backup] Background registration failed: ${getErrorMessage(error)}`);
     });
   },
   setSelectedDate: async (date) => {
@@ -127,9 +143,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ selectedDate: entry.startDate });
     await get().refresh();
   },
+  updateDayEntry: async (entry) => {
+    await updateManualDayEntry(entry);
+    set({ selectedDate: entry.date });
+    await get().refresh();
+  },
   updateSetting: async (key, value) => {
     await writeSetting(key, value);
-    set({ settings: { ...get().settings, [key]: value } });
+    const settings = { ...get().settings, [key]: value };
+    set({ settings });
+    if (key === "cloudBackupEnabled" || key === "autoBackup" || key === "autoBackupFrequency") {
+      await syncBackgroundBackupRegistration(settings);
+    }
   },
   runGeocodeQueue: async () => {
     try {

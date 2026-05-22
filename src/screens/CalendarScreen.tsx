@@ -279,6 +279,13 @@ type ManualTravelEntry = {
   countryName: string;
 };
 
+type DayLocationEntry = {
+  originalDate: string;
+  date: string;
+  countryCode: string;
+  countryName: string;
+};
+
 type CalendarCell = {
   date: Date;
   iso: string;
@@ -291,11 +298,12 @@ type CalendarCell = {
 export function CalendarScreen() {
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
-  const { monthRecords, selectedDate, setSelectedDate, settings, addManualEntry } = useAppStore();
+  const { monthRecords, selectedDate, setSelectedDate, settings, addManualEntry, updateDayEntry } = useAppStore();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getPalette(isDark);
   const [month, setMonth] = useState(() => startOfMonth(parseISO(selectedDate)));
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [openManualEntryAfterMenuClose, setOpenManualEntryAfterMenuClose] = useState(false);
@@ -304,9 +312,11 @@ export function CalendarScreen() {
   const recordsByDate = useMemo(() => new Map(monthRecords.map((record) => [record.date, record])), [monthRecords]);
   const cells = useMemo(() => buildCalendarCells(month), [month]);
   const monthSummary = useMemo(() => buildMonthSummary(monthRecords, month), [monthRecords, month]);
+  const editingRecord = editingDate ? recordsByDate.get(editingDate) : undefined;
 
   async function selectDay(iso: string) {
     await setSelectedDate(iso);
+    setEditingDate(iso);
   }
 
   async function shiftMonth(direction: -1 | 1) {
@@ -346,6 +356,11 @@ export function CalendarScreen() {
   async function insertManualEntry(entry: ManualTravelEntry) {
     await addManualEntry(entry);
     setMonth(startOfMonth(parseISO(entry.startDate)));
+  }
+
+  async function updateDay(entry: DayLocationEntry) {
+    await updateDayEntry(entry);
+    setMonth(startOfMonth(parseISO(entry.date)));
   }
 
   return (
@@ -490,6 +505,17 @@ export function CalendarScreen() {
         onConfirm={async (entry) => {
           await insertManualEntry(entry);
           setIsManualEntryOpen(false);
+        }}
+      />
+      <DayEditDrawer
+        initialCountryInput={editingRecord?.primary_country_name ?? editingRecord?.primary_country_code ?? ""}
+        initialDate={editingDate ?? selectedDateInMonth}
+        palette={palette}
+        visible={Boolean(editingDate)}
+        onClose={() => setEditingDate(null)}
+        onConfirm={async (entry) => {
+          await updateDay(entry);
+          setEditingDate(null);
         }}
       />
     </>
@@ -702,6 +728,14 @@ function MonthYearPicker({
     opacity: progress.value * interpolate(dragY.value, [0, 220], [1, 0.24], Extrapolation.CLAMP)
   }));
 
+  const backdropBlurStyle = useAnimatedStyle(() => ({
+    opacity: progress.value * interpolate(dragY.value, [0, 220], [1, 0], Extrapolation.CLAMP)
+  }));
+
+  const drawerBlurStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.62, 1], [0, 0.82, 1]) * interpolate(dragY.value, [0, 220], [1, 0.32], Extrapolation.CLAMP)
+  }));
+
   const drawerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.55, 1], [0, 1, 1]),
     transform: [
@@ -723,8 +757,8 @@ function MonthYearPicker({
   return (
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
+        <FadingBlurLayer tint={palette.blurTint} intensity={18} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={backdropBlurStyle} />
         <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
-          <GlassBlurLayer tint={palette.blurTint} intensity={18} style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
         </Animated.View>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -739,7 +773,7 @@ function MonthYearPicker({
             drawerStyle
           ]}
         >
-          <GlassBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+          <FadingBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={drawerBlurStyle} />
           <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
           <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
           <View style={[styles.monthDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
@@ -920,6 +954,14 @@ function ManualEntryDrawer({
     opacity: progress.value * interpolate(dragY.value, [0, 260], [1, 0.2], Extrapolation.CLAMP)
   }));
 
+  const backdropBlurStyle = useAnimatedStyle(() => ({
+    opacity: progress.value * interpolate(dragY.value, [0, 260], [1, 0], Extrapolation.CLAMP)
+  }));
+
+  const drawerBlurStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.62, 1], [0, 0.82, 1]) * interpolate(dragY.value, [0, 260], [1, 0.32], Extrapolation.CLAMP)
+  }));
+
   const drawerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.55, 1], [0, 1, 1]),
     transform: [
@@ -980,8 +1022,8 @@ function ManualEntryDrawer({
   return (
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalRoot}>
+        <FadingBlurLayer tint={palette.blurTint} intensity={18} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={backdropBlurStyle} />
         <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
-          <GlassBlurLayer tint={palette.blurTint} intensity={18} style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
         </Animated.View>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -996,7 +1038,7 @@ function ManualEntryDrawer({
             drawerStyle
           ]}
         >
-          <GlassBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+          <FadingBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={drawerBlurStyle} />
           <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
           <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
           <View style={[styles.manualDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
@@ -1184,6 +1226,280 @@ function ManualEntryDrawer({
   );
 }
 
+function DayEditDrawer({
+  initialCountryInput,
+  initialDate,
+  palette,
+  visible,
+  onClose,
+  onConfirm
+}: {
+  initialCountryInput: string;
+  initialDate: string;
+  palette: ReturnType<typeof getPalette>;
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (entry: DayLocationEntry) => Promise<void>;
+}) {
+  const insets = useSafeAreaInsets();
+  const [isRendered, setIsRendered] = useState(visible);
+  const [draftDate, setDraftDate] = useState(initialDate);
+  const [countryInput, setCountryInput] = useState(initialCountryInput);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const progress = useSharedValue(visible ? 1 : 0);
+  const dragY = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      setDraftDate(initialDate);
+      setCountryInput(initialCountryInput);
+      setErrorMessage(null);
+      setIsSaving(false);
+      setIsRendered(true);
+      dragY.value = 0;
+      progress.value = withSpring(1, {
+        damping: 24,
+        mass: 0.85,
+        stiffness: 190
+      });
+      return;
+    }
+
+    progress.value = withTiming(
+      0,
+      {
+        duration: 190,
+        easing: ReanimatedEasing.in(ReanimatedEasing.quad)
+      },
+      (finished) => {
+        if (finished) {
+          dragY.value = 0;
+          runOnJS(setIsRendered)(false);
+        }
+      }
+    );
+  }, [dragY, initialCountryInput, initialDate, progress, visible]);
+
+  const drawerGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY(8)
+        .failOffsetX([-18, 18])
+        .onUpdate((event) => {
+          dragY.value = Math.max(0, event.translationY);
+        })
+        .onEnd((event) => {
+          const shouldClose = event.translationY > 104 || event.velocityY > 820;
+          if (shouldClose) {
+            runOnJS(onClose)();
+            return;
+          }
+
+          dragY.value = withSpring(0, {
+            damping: 22,
+            mass: 0.8,
+            stiffness: 220
+          });
+        }),
+    [dragY, onClose]
+  );
+
+  const matchingCountryOptions = useMemo(() => {
+    const normalizedInput = normalizeSearchText(countryInput);
+    const matches = normalizedInput
+      ? countryOptions.filter((country) => {
+          const normalizedName = normalizeSearchText(country.name);
+          return normalizedName.includes(normalizedInput) || country.code.toLowerCase().startsWith(normalizedInput);
+        })
+      : countryOptions.slice(0, 12);
+
+    return matches.slice(0, 12);
+  }, [countryInput]);
+
+  const selectedCountry = resolveCountry(countryInput);
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: progress.value * interpolate(dragY.value, [0, 260], [1, 0.2], Extrapolation.CLAMP)
+  }));
+
+  const backdropBlurStyle = useAnimatedStyle(() => ({
+    opacity: progress.value * interpolate(dragY.value, [0, 260], [1, 0], Extrapolation.CLAMP)
+  }));
+
+  const drawerBlurStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.62, 1], [0, 0.82, 1]) * interpolate(dragY.value, [0, 260], [1, 0.32], Extrapolation.CLAMP)
+  }));
+
+  const drawerStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.55, 1], [0, 1, 1]),
+    transform: [
+      { translateY: interpolate(progress.value, [0, 1], [460, 0]) + dragY.value },
+      { scale: interpolate(dragY.value, [0, 260], [1, 0.984], Extrapolation.CLAMP) }
+    ]
+  }));
+
+  async function submit() {
+    const result = buildDayLocationEntry(initialDate, draftDate, countryInput);
+    if ("message" in result) {
+      setErrorMessage(result.message);
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsSaving(true);
+    try {
+      await onConfirm(result.entry);
+    } catch (error) {
+      setIsSaving(false);
+      setErrorMessage(error instanceof Error ? error.message : "Could not update this day.");
+    }
+  }
+
+  if (!isRendered) return null;
+
+  return (
+    <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalRoot}>
+        <FadingBlurLayer tint={palette.blurTint} intensity={18} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={backdropBlurStyle} />
+        <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
+        </Animated.View>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.manualDrawer,
+            {
+              borderColor: palette.glassBorder,
+              paddingBottom: Math.max(insets.bottom, 12),
+              shadowColor: palette.glassShadow
+            },
+            drawerStyle
+          ]}
+        >
+          <FadingBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={drawerBlurStyle} />
+          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
+          <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
+          <View style={[styles.manualDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
+          <GestureDetector gesture={drawerGesture}>
+            <Animated.View style={styles.drawerHandleTouchArea}>
+              <View style={[styles.drawerHandle, { backgroundColor: palette.glassBorder }]} />
+            </Animated.View>
+          </GestureDetector>
+
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
+            <View style={styles.drawerHeaderRow}>
+              <View style={[styles.drawerIcon, { backgroundColor: palette.card }]}>
+                <PencilLine size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+              </View>
+              <View style={styles.drawerHeaderText}>
+                <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
+                  Edit Day
+                </Text>
+                <Text className="text-xs" style={{ color: palette.muted }}>
+                  Final location
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.manualForm}>
+              <View style={styles.fieldGroup}>
+                <Text className="text-xs font-bold" style={{ color: palette.muted }}>
+                  Date
+                </Text>
+                <TextInput
+                  accessibilityLabel="Final location date"
+                  autoCapitalize="none"
+                  inputMode="numeric"
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={palette.placeholder}
+                  style={[styles.manualInput, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder, color: palette.foreground }]}
+                  value={draftDate}
+                  onChangeText={(value) => {
+                    setDraftDate(value);
+                    setErrorMessage(null);
+                  }}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text className="text-xs font-bold" style={{ color: palette.muted }}>
+                  Country
+                </Text>
+                <View style={[styles.countryInputShell, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
+                  <Globe2 size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
+                  <TextInput
+                    accessibilityLabel="Final location country"
+                    autoCapitalize="words"
+                    placeholder="Country name or code"
+                    placeholderTextColor={palette.placeholder}
+                    style={[styles.countryInput, { color: palette.foreground }]}
+                    value={countryInput}
+                    onChangeText={(value) => {
+                      setCountryInput(value);
+                      setErrorMessage(null);
+                    }}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.countryChips}>
+                {matchingCountryOptions.map((country) => {
+                  const selected = selectedCountry?.code === country.code;
+                  return (
+                    <Pressable
+                      key={country.code}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select ${country.name} ${country.code}`}
+                      style={[
+                        styles.countryChip,
+                        {
+                          backgroundColor: selected ? palette.selectedFill : palette.chipFill,
+                          borderColor: selected ? palette.selectedBorder : palette.inputBorder
+                        }
+                      ]}
+                      onPress={() => {
+                        setCountryInput(country.name);
+                        setErrorMessage(null);
+                      }}
+                    >
+                      <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
+                        {country.name} ({country.code})
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {errorMessage ? (
+                <View style={[styles.errorBox, { backgroundColor: palette.errorFill, borderColor: palette.errorBorder }]}>
+                  <Text className="text-xs font-bold" style={{ color: palette.errorText }}>
+                    {errorMessage}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.drawerActions}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancel day edit" disabled={isSaving} style={[styles.secondaryAction, { backgroundColor: palette.chipFill, borderColor: palette.inputBorder }]} onPress={onClose}>
+                <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Update day" disabled={isSaving} style={[styles.primaryAction, { backgroundColor: palette.foreground, opacity: isSaving ? 0.65 : 1 }]} onPress={() => void submit()}>
+                <Check size={18} color={palette.screen} strokeWidth={iconStrokeWidth} />
+                <Text className="text-sm font-bold" style={{ color: palette.screen }}>
+                  {isSaving ? "Updating" : "Update"}
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function DateBoundaryButton({
   active,
   label,
@@ -1317,6 +1633,24 @@ function GlassBlurLayer({ tint, intensity, style }: { tint: ReturnType<typeof ge
   return <View style={[style, { backgroundColor: tint === "dark" ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.08)" }]} />;
 }
 
+function FadingBlurLayer({
+  blurStyle,
+  intensity,
+  style,
+  tint
+}: {
+  blurStyle: StyleProp<ViewStyle>;
+  intensity: number;
+  style?: StyleProp<ViewStyle>;
+  tint: ReturnType<typeof getPalette>["blurTint"];
+}) {
+  return (
+    <Animated.View style={[style, blurStyle]}>
+      <GlassBlurLayer tint={tint} intensity={intensity} style={StyleSheet.absoluteFill} />
+    </Animated.View>
+  );
+}
+
 function AddMenuAction({ icon, label, onPress, palette }: { icon: "manual" | "photos"; label: string; onPress: () => void; palette: ReturnType<typeof getPalette> }) {
   const Icon = icon === "manual" ? PencilLine : Images;
 
@@ -1354,6 +1688,22 @@ function buildManualEntry(year: string, startDate: string, endDate: string, coun
     entry: {
       startDate,
       endDate,
+      countryCode: country.code,
+      countryName: country.name
+    }
+  };
+}
+
+function buildDayLocationEntry(originalDate: string, date: string, countryInput: string): { entry: DayLocationEntry } | { message: string } {
+  if (!isValidIsoDate(date)) return { message: "Choose a valid date." };
+
+  const country = resolveCountry(countryInput);
+  if (!country) return { message: "Enter a recognized country name or 2-letter code." };
+
+  return {
+    entry: {
+      originalDate,
+      date,
       countryCode: country.code,
       countryName: country.name
     }

@@ -1,3 +1,4 @@
+import AppIntents
 import Expo
 import React
 import ReactAppDependencyProvider
@@ -13,6 +14,11 @@ class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    ForceQuitLocationService.shared.configure(launchOptions: launchOptions)
+    if #available(iOS 16.0, *) {
+      NomadTrackShortcuts.updateAppShortcutParameters()
+    }
+
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

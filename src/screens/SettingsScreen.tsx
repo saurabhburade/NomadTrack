@@ -32,13 +32,12 @@ import {
   storeGoogleTokenResponse,
   useGoogleDriveAuthRequest
 } from "../services/auth/googleAuth";
-import { listDriveBackups, uploadBackupToDrive, writeLocalBackupFile } from "../services/backup/driveBackup";
+import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile } from "../services/backup/driveBackup";
 import { exportLocationCsv } from "../services/export/csvExport";
 import { startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 import type { TrackingIntervalHours } from "../types/models";
 
-const intervals: TrackingIntervalHours[] = [1, 2, 4, 8, "manual"];
 const appearanceOptions = [
   { value: "system", label: "System", Icon: Monitor },
   { value: "light", label: "Light", Icon: Sun },
@@ -56,7 +55,7 @@ type BackupStatus = {
 type GoogleConnectionState = Awaited<ReturnType<typeof getGoogleDriveConnectionState>>;
 type SettingsPalette = ReturnType<typeof getSettingsPalette>;
 type SettingsIcon = ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-type SettingsDrawer = "tracking" | "residency" | "appearance" | null;
+type SettingsDrawer = "residency" | "appearance" | null;
 type ChoiceOption = {
   value: string;
   label: string;
@@ -73,7 +72,7 @@ const defaultGoogleConnection: GoogleConnectionState = {
 const googleLoginRequiredMessage = "Please log in with Google. Backup won't work unless Google Drive is connected.";
 
 export function SettingsScreen() {
-  const { settings, updateSetting, refresh } = useAppStore();
+  const { settings, updateSetting, refresh, setSelectedDate } = useAppStore();
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const [googleAuthRequest, response, promptAsync] = useGoogleDriveAuthRequest();
@@ -87,7 +86,7 @@ export function SettingsScreen() {
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getSettingsPalette(isDark);
   const googleDriveUnavailable = !googleAuthSetup.canUseGoogleAuth || !googleAuthRequest;
-  const trackingDetail = settings.trackingPaused ? "Paused" : `Updates ${formatTrackingInterval(settings.trackingInterval).toLowerCase()}`;
+  const trackingDetail = settings.trackingPaused ? "Paused" : "Active";
   const googleDriveDetail = getGoogleDriveDetail({
     isExpoGo: googleAuthSetup.isExpoGo,
     unavailable: googleDriveUnavailable,
@@ -109,11 +108,23 @@ export function SettingsScreen() {
     void refreshGoogleConnectionState();
   }, []);
 
-  async function setInterval(value: TrackingIntervalHours) {
-    await updateSetting("trackingInterval", value);
-    if (value === "manual" || settings.trackingPaused) await stopBackgroundTracking();
-    else await startBackgroundTracking(value);
-    await refresh();
+  async function setTrackingPaused(paused: boolean) {
+    if (paused) {
+      await updateSetting("trackingPaused", true);
+      await stopBackgroundTracking();
+      return;
+    }
+
+    const interval: TrackingIntervalHours = settings.trackingInterval === "manual" ? 4 : settings.trackingInterval;
+    if (settings.trackingInterval === "manual") {
+      await updateSetting("trackingInterval", interval);
+    }
+
+    const started = await startBackgroundTracking(interval);
+    await updateSetting("trackingPaused", !started);
+    if (!started) {
+      Alert.alert("Always location required", "Allow location access always to use Auto Track Location.");
+    }
   }
 
   function openResidencyDrawer() {
@@ -218,6 +229,49 @@ export function SettingsScreen() {
     }
   }
 
+  function confirmRestoreLatestBackup() {
+    Alert.alert(
+      "Restore latest backup?",
+      "This will replace data for the backup's year with the latest Google Drive backup. Other years will be left unchanged.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Restore", style: "destructive", onPress: () => void restoreLatestBackup() }
+      ]
+    );
+  }
+
+  async function restoreLatestBackup() {
+    setIsBackupBusy(true);
+    try {
+      const canUseBackup = await ensureGoogleDriveLogin();
+      if (!canUseBackup) return;
+
+      setBackupStatus({ tone: "info", message: "Restoring latest Google Drive backup..." });
+      const result = await restoreLatestDriveBackup();
+      const restoredCount = Object.values(result.restoredRows).reduce((sum, count) => sum + count, 0);
+      const travelRows =
+        result.restoredRows.location_points +
+        result.restoredRows.day_records +
+        result.restoredRows.day_country_segments +
+        result.restoredRows.trips +
+        result.restoredRows.pending_geocode_jobs;
+      setBackupStatus({
+        tone: travelRows > 0 ? "success" : "error",
+        message:
+          travelRows > 0
+            ? `Restore complete: ${restoredCount} rows from ${result.file.year ?? result.backup.scope.label} backup updated ${formatBackupTime(result.file.modifiedTime)}.`
+            : `Restore finished, but this backup only contained settings. No travel history was found in the ${result.file.year ?? result.backup.scope.label} backup.`
+      });
+      await refreshGoogleConnectionState();
+      await setSelectedDate(result.displayDate);
+      await refresh();
+    } catch (error) {
+      handleBackupError(error, "Restore failed.");
+    } finally {
+      setIsBackupBusy(false);
+    }
+  }
+
   return (
     <>
       <ScrollView
@@ -242,15 +296,13 @@ export function SettingsScreen() {
                   thumbColor={settings.trackingPaused ? palette.switchOnThumb : palette.switchThumb}
                   trackColor={{ false: palette.switchOff, true: palette.switchOn }}
                   value={settings.trackingPaused}
-                  onValueChange={(value) => void updateSetting("trackingPaused", value).then(() => (value ? stopBackgroundTracking() : startBackgroundTracking(settings.trackingInterval)))}
+                  onValueChange={(value) => void setTrackingPaused(value)}
                 />
               }
               detail={trackingDetail}
               palette={palette}
               title="Pause Tracking"
             />
-            <SettingsDivider palette={palette} />
-            <SettingsRow Icon={Clock3} detail={formatTrackingInterval(settings.trackingInterval)} palette={palette} title="Tracking Interval" onPress={() => setActiveDrawer("tracking")} />
           </SettingsGroup>
         </SettingsSection>
 
@@ -270,6 +322,23 @@ export function SettingsScreen() {
               detail={settings.cloudBackupEnabled ? "Enabled" : "Disabled"}
               palette={palette}
               title="Cloud Backup"
+            />
+            <SettingsDivider palette={palette} />
+            <SettingsRow
+              Icon={Clock3}
+              accessory={
+                <Switch
+                  ios_backgroundColor={palette.switchOff}
+                  thumbColor={settings.autoBackup ? palette.switchOnThumb : palette.switchThumb}
+                  trackColor={{ false: palette.switchOff, true: palette.switchOn }}
+                  value={settings.autoBackup}
+                  onValueChange={(value) => void updateSetting("autoBackup", value)}
+                />
+              }
+              detail={settings.autoBackup ? "Enabled" : "Disabled"}
+              disabled={!settings.cloudBackupEnabled}
+              palette={palette}
+              title="Auto Backup"
             />
             <SettingsDivider palette={palette} />
             <SettingsRow
@@ -298,11 +367,11 @@ export function SettingsScreen() {
             <SettingsDivider palette={palette} />
             <SettingsRow
               Icon={Download}
-              detail={googleDriveUnavailable ? "Needs Google Drive" : "Find Drive backups"}
+              detail={googleDriveUnavailable ? "Needs Google Drive" : "Download latest backup"}
               disabled={isBackupBusy || googleDriveUnavailable}
               palette={palette}
-              title="Check Restore Backups"
-              onPress={() => void checkDriveBackups()}
+              title={isBackupBusy ? "Working..." : "Restore Backup"}
+              onPress={confirmRestoreLatestBackup}
             />
           </SettingsGroup>
         </SettingsSection>
@@ -332,20 +401,6 @@ export function SettingsScreen() {
         </SettingsSection>
       </ScrollView>
 
-      <ChoiceSettingsDrawer
-        Icon={Clock3}
-        detail="Choose how often background tracking refreshes."
-        options={intervals.map((value) => ({ value: String(value), label: value === "manual" ? "Manual" : `${value}h`, detail: formatTrackingInterval(value) }))}
-        palette={palette}
-        selectedValue={String(settings.trackingInterval)}
-        title="Tracking Interval"
-        visible={activeDrawer === "tracking"}
-        onClose={() => setActiveDrawer(null)}
-        onSelect={(value) => {
-          setActiveDrawer(null);
-          void setInterval(parseTrackingIntervalValue(value));
-        }}
-      />
       <ResidencySettingsDrawer
         calendarYearMode={draftCalendarYearMode}
         palette={palette}
@@ -764,17 +819,6 @@ function BackupStatusMessage({ palette, status }: { palette: SettingsPalette; st
 function getResidencyYearLabel(year: number, calendarYearMode: boolean) {
   if (calendarYearMode) return String(year);
   return `FY ${String(year - 1).slice(-2)}-${String(year).slice(-2)}`;
-}
-
-function formatTrackingInterval(value: TrackingIntervalHours) {
-  if (value === "manual") return "Manual";
-  return value === 1 ? "Every hour" : `Every ${value} hours`;
-}
-
-function parseTrackingIntervalValue(value: string): TrackingIntervalHours {
-  if (value === "manual") return "manual";
-  const interval = Number(value) as TrackingIntervalHours;
-  return intervals.includes(interval) ? interval : 4;
 }
 
 function getAppearanceLabel(value: "system" | "light" | "dark") {

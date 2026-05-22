@@ -1,8 +1,9 @@
-export type LocationSource = "gps" | "gps_offline" | "manual" | "photo" | "import";
+export type LocationSource = "gps" | "gps_offline" | "manual" | "photo" | "import" | "visit" | "slc" | "region-exit" | "region-enter" | "shortcuts" | "charger-connected";
 export type ReverseGeocodeStatus = "pending" | "done" | "failed";
 export type GeocodeJobStatus = "pending" | "processing" | "done" | "failed";
-export type TrackingIntervalHours = 1 | 2 | 4 | 8 | "manual";
+export type TrackingIntervalHours = "1m" | 1 | 2 | 4 | 8 | "manual";
 export type DayCountingRule = "departure" | "arrival" | "longest_duration" | "manual";
+export type AutoBackupFrequency = "1m" | "daily" | "weekly" | "monthly";
 
 export type LocationPoint = {
   id: string;
@@ -90,10 +91,13 @@ export type AppSettings = {
   calendarYearMode: boolean;
   dayCountingRule: DayCountingRule;
   autoBackup: boolean;
+  autoBackupFrequency: AutoBackupFrequency;
   wifiOnlyBackup: boolean;
   appearance: "system" | "light" | "dark";
   cloudBackupEnabled: boolean;
   onboardingCompleted: boolean;
+  shortcutsAutomationClaimedAt?: string;
+  shortcutsAutomationLastVerifiedAt?: string;
 };
 
 export type DashboardSummary = {

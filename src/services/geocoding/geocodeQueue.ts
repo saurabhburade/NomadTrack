@@ -9,6 +9,7 @@ import {
 } from "../../db/database";
 import { recalculateDayForPoints } from "../calculations/dayAssignment";
 import { toIsoDate } from "../../lib/utils";
+import { resolveCountryFromBoundaries } from "./countryBoundaryLookup";
 
 type ReverseGeocodeResult = {
   countryCode: string;
@@ -20,30 +21,49 @@ type ReverseGeocodeResult = {
 
 const backoffMinutes = [5, 30, 120, 720, 1440];
 const legacyMissingEndpointError = "Reverse geocoding endpoint is not configured";
+const reverseGeocodeTimeoutMs = 60 * 1000;
 
 export async function processGeocodeQueue() {
   const network = await Network.getNetworkStateAsync();
-  if (!network.isInternetReachable) return { processed: 0, skipped: true };
-
   const jobs = await getPendingGeocodeJobs();
   let processed = 0;
   for (const job of jobs) {
     if (!isRetryDue(job.retry_count, job.last_attempt_at ?? undefined, job.error ?? undefined)) continue;
     try {
+      if (!network.isInternetReachable) {
+        const fallback = resolveCountryFromBoundaries(job.latitude, job.longitude);
+        if (!fallback) continue;
+        await completeGeocodeJob(job, fallback);
+        processed += 1;
+        continue;
+      }
+
       await updateGeocodeJob(job.id, "processing", job.retry_count);
-      const result = await reverseGeocode(job.latitude, job.longitude);
-      await updateLocationGeocode(job.location_point_id, result);
-      await updateGeocodeJob(job.id, "done", job.retry_count);
-      const settings = await readSettings();
-      const dayPoints = await readLocationPointsForDate(toIsoDate(job.timestamp));
-      await recalculateDayForPoints(dayPoints, settings);
+      const result = await reverseGeocodeWithBoundaryFallback(job.latitude, job.longitude);
+      await completeGeocodeJob(job, result);
       processed += 1;
     } catch (error) {
       await updateGeocodeJob(job.id, "failed", job.retry_count + 1, error instanceof Error ? error.message : "Unknown error");
     }
   }
 
-  return { processed, skipped: false };
+  return { processed, skipped: !network.isInternetReachable };
+}
+
+async function completeGeocodeJob(
+  job: {
+    id: string;
+    location_point_id: string;
+    retry_count: number;
+    timestamp: string;
+  },
+  result: ReverseGeocodeResult
+) {
+  await updateLocationGeocode(job.location_point_id, result);
+  await updateGeocodeJob(job.id, "done", job.retry_count);
+  const settings = await readSettings();
+  const dayPoints = await readLocationPointsForDate(toIsoDate(job.timestamp));
+  await recalculateDayForPoints(dayPoints, settings);
 }
 
 function isRetryDue(retryCount: number, lastAttemptAt?: string, lastError?: string) {
@@ -53,8 +73,25 @@ function isRetryDue(retryCount: number, lastAttemptAt?: string, lastError?: stri
   return Date.now() - new Date(lastAttemptAt).getTime() >= waitMinutes * 60 * 1000;
 }
 
+async function reverseGeocodeWithBoundaryFallback(latitude: number, longitude: number): Promise<ReverseGeocodeResult> {
+  try {
+    return await reverseGeocode(latitude, longitude);
+  } catch (error) {
+    const fallback = resolveCountryFromBoundaries(latitude, longitude);
+    if (fallback) {
+      console.warn(`[geocode] Platform reverse geocode failed; using local country boundary: ${getErrorMessage(error)}`);
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 async function reverseGeocode(latitude: number, longitude: number): Promise<ReverseGeocodeResult> {
-  const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+  const [address] = await withTimeout(
+    "Reverse geocoding",
+    Location.reverseGeocodeAsync({ latitude, longitude }),
+    reverseGeocodeTimeoutMs
+  );
   if (!address) throw new Error("Reverse geocoding returned no address");
 
   const countryCode = address.isoCountryCode?.trim().toUpperCase();
@@ -68,4 +105,21 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<Reve
     city: address.city ?? address.district ?? address.subregion ?? undefined,
     timezone: address.timezone ?? undefined
   };
+}
+
+async function withTimeout<T>(label: string, promise: Promise<T>, timeoutMs: number) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }

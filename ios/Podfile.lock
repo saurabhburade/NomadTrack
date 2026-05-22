@@ -250,6 +250,8 @@ PODS:
     - Yoga
   - ExpoAsset (12.0.13):
     - ExpoModulesCore
+  - ExpoBackgroundTask (1.0.10):
+    - ExpoModulesCore
   - ExpoBlur (55.0.14):
     - ExpoModulesCore
   - ExpoCrypto (15.0.9):
@@ -2652,6 +2654,35 @@ PODS:
     - React-perflogger (= 0.81.5)
     - React-utils (= 0.81.5)
     - SocketRocket
+  - RNBackgroundGeolocation (5.1.1):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - TSLocationManager (~> 4.1.0)
+    - Yoga
   - RNGestureHandler (2.28.0):
     - boost
     - DoubleConversion
@@ -2978,6 +3009,9 @@ PODS:
     - SocketRocket
     - Yoga
   - SocketRocket (0.7.1)
+  - TSBackgroundFetch (4.1.1)
+  - TSLocationManager (4.1.7):
+    - TSBackgroundFetch (~> 4.1.0)
   - UMAppLoader (6.0.8)
   - Yoga (0.0.0)
 
@@ -2995,6 +3029,7 @@ DEPENDENCIES:
   - "expo-dev-menu (from `../node_modules/.pnpm/expo-dev-menu@7.0.19_expo@54.0.34/node_modules/expo-dev-menu`)"
   - "expo-dev-menu-interface (from `../node_modules/.pnpm/expo-dev-menu-interface@2.0.0_expo@54.0.34/node_modules/expo-dev-menu-interface/ios`)"
   - "ExpoAsset (from `../node_modules/.pnpm/expo-asset@12.0.13_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+me_acc7f5f32bf77f8ebf36e03c8ac09f2c/node_modules/expo-asset/ios`)"
+  - "ExpoBackgroundTask (from `../node_modules/.pnpm/expo-background-task@1.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-_da94a9974c85190fbaf334d79b41f3ea/node_modules/expo-background-task/ios`)"
   - "ExpoBlur (from `../node_modules/.pnpm/expo-blur@55.0.14_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+met_5e4d01434d9ae7d7dd6b61c4f16e0926/node_modules/expo-blur/ios`)"
   - "ExpoCrypto (from `../node_modules/.pnpm/expo-crypto@15.0.9_expo@54.0.34/node_modules/expo-crypto/ios`)"
   - "ExpoFileSystem (from `../node_modules/.pnpm/expo-file-system@19.0.22_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_ff6f7e1c9e8f1ae612cfaacdc8de68d3/node_modules/expo-file-system/ios`)"
@@ -3082,6 +3117,7 @@ DEPENDENCIES:
   - ReactAppDependencyProvider (from `build/generated/ios`)
   - ReactCodegen (from `build/generated/ios`)
   - "ReactCommon/turbomodule/core (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-config@0.85.3_@babel+core@7._03bfb29fbaad688f405e50640065393e/node_modules/react-native/ReactCommon`)"
+  - "RNBackgroundGeolocation (from `../node_modules/.pnpm/react-native-background-geolocation@5.1.1/node_modules/react-native-background-geolocation`)"
   - "RNGestureHandler (from `../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.29.0_@react-nativ_069075bec13e077453125d95a4cd96e1/node_modules/react-native-gesture-handler`)"
   - "RNReanimated (from `../node_modules/.pnpm/react-native-reanimated@4.1.7_react-native-worklets@0.5.1_@babel+core@7.29.0_react-nati_6a6c93f68f4ff792d1dbe9fff6618d6f/node_modules/react-native-reanimated`)"
   - "RNScreens (from `../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-_a8b8b4ae2b81e5e12f49cf68e2c06f70/node_modules/react-native-screens`)"
@@ -3094,6 +3130,8 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - SocketRocket
+    - TSBackgroundFetch
+    - TSLocationManager
 
 EXTERNAL SOURCES:
   boost:
@@ -3122,6 +3160,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-dev-menu-interface@2.0.0_expo@54.0.34/node_modules/expo-dev-menu-interface/ios"
   ExpoAsset:
     :path: "../node_modules/.pnpm/expo-asset@12.0.13_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+me_acc7f5f32bf77f8ebf36e03c8ac09f2c/node_modules/expo-asset/ios"
+  ExpoBackgroundTask:
+    :path: "../node_modules/.pnpm/expo-background-task@1.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-_da94a9974c85190fbaf334d79b41f3ea/node_modules/expo-background-task/ios"
   ExpoBlur:
     :path: "../node_modules/.pnpm/expo-blur@55.0.14_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+met_5e4d01434d9ae7d7dd6b61c4f16e0926/node_modules/expo-blur/ios"
   ExpoCrypto:
@@ -3295,6 +3335,8 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-config@0.85.3_@babel+core@7._03bfb29fbaad688f405e50640065393e/node_modules/react-native/ReactCommon"
+  RNBackgroundGeolocation:
+    :path: "../node_modules/.pnpm/react-native-background-geolocation@5.1.1/node_modules/react-native-background-geolocation"
   RNGestureHandler:
     :path: "../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.29.0_@react-nativ_069075bec13e077453125d95a4cd96e1/node_modules/react-native-gesture-handler"
   RNReanimated:
@@ -3324,6 +3366,7 @@ SPEC CHECKSUMS:
   expo-dev-menu: 874309605351680f527237eea2cb34c1b5f2f158
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAsset: 9e5a7c9c0a9fb83ad5b2bb365141f2bd7f289b66
+  ExpoBackgroundTask: 835449414ab9f0e551de1f6d382fadbfad191dc7
   ExpoBlur: 7a86e84e7728108fa6908d7103fa527705a3dbbf
   ExpoCrypto: e2a2c4c748aac8485e5675f027b7901f511d43ff
   ExpoFileSystem: ad991457efaa14253723f1dda997eac6024c700d
@@ -3410,15 +3453,18 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 1bcd3527ac0390a1c898c114f81ff954be35ed79
   ReactCodegen: 34611659e7605668ddbf71ab32a3f46fa86986dd
   ReactCommon: 5f0e5c09a64a2717215dd84380e1a747810406f2
+  RNBackgroundGeolocation: 68017f04ca292cfdde26becac33ae801157c91fb
   RNGestureHandler: 3a73f098d74712952870e948b3d9cf7b6cae9961
   RNReanimated: a17f38564cbab44c0fe2d628772e9a948b3e3aec
   RNScreens: 0bbf16c074ae6bb1058a7bf2d1ae017f4306797c
   RNSVG: 6f39605a4c4d200b11435c35bd077553c6b5963a
   RNWorklets: 94e024ba90a670735ffdb82258174159326c7f95
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  TSBackgroundFetch: 18918b6449a1e3f01eb0f5b44d6d79ce6160a5a5
+  TSLocationManager: 0c1b8ed109ae05ea4247def2992b3e4e3f49f839
   UMAppLoader: 145337733539f9af9b3dd97eeaa7f3bd97cacb23
   Yoga: 728df40394d49f3f471688747cf558158b3a3bd1
 
-PODFILE CHECKSUM: b89a916ec50644319a702cf182b11c0c8b487284
+PODFILE CHECKSUM: a6f9fa459ddc996e86b85c51406dfa0563234f91
 
 COCOAPODS: 1.16.2

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */; };
+		C0DEF002C0DEF002C0DEF002 /* ForceQuitLocationModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */; };
+		C0DEF005C0DEF005C0DEF005 /* LogTodayCountryIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1F497C1C2ED16D6A8C447571 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F893A67DEAEBE40E62BE1800 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
@@ -17,6 +20,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ForceQuitLocationModule.swift; path = TravelNRITracker/ForceQuitLocationModule.swift; sourceTree = "<group>"; };
+		C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ForceQuitLocationModuleBridge.m; path = TravelNRITracker/ForceQuitLocationModuleBridge.m; sourceTree = "<group>"; };
+		C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogTodayCountryIntent.swift; path = TravelNRITracker/LogTodayCountryIntent.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* TravelNRITracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TravelNRITracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = TravelNRITracker/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = TravelNRITracker/Info.plist; sourceTree = "<group>"; };
@@ -48,6 +54,9 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */,
+				C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */,
+				C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */,
 				F11748442D0722820044C1D9 /* TravelNRITracker-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -166,6 +175,7 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -280,6 +290,7 @@
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoMediaLibrary/ExpoMediaLibrary_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNBackgroundGeolocation/TSLocationManagerPrivacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
@@ -299,6 +310,7 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoMediaLibrary_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/TSLocationManagerPrivacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
@@ -339,6 +351,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */,
+				C0DEF002C0DEF002C0DEF002 /* ForceQuitLocationModuleBridge.m in Sources */,
+				C0DEF005C0DEF005C0DEF005 /* LogTodayCountryIntent.swift in Sources */,
 				C94A2E5CCA2E885F7D86C992 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -353,6 +368,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = TravelNRITracker/TravelNRITracker.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 87PX5G224U;
 				ENABLE_BITCODE = NO;
@@ -390,6 +406,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = TravelNRITracker/TravelNRITracker.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 87PX5G224U;
 				INFOPLIST_FILE = TravelNRITracker/Info.plist;

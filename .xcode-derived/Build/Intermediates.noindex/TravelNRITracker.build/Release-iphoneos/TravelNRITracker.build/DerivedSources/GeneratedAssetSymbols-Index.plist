@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/saurabh/Desktop/codex/Travel Tracker App/ios/TravelNRITracker/Images.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameSplashScreenBackground</string>
+			<key>relativePath</key>
+			<string>./SplashScreenBackground.colorset</string>
+			<key>swiftSymbol</key>
+			<string>splashScreenBackground</string>
+		</dict>
+	</array>
+	<key>images</key>
+	<array/>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>
