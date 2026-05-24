@@ -1,0 +1,37 @@
+diff --git a/ios/Button/Button.swift b/ios/Button/Button.swift
+index b61515b2eb76cb07d64f95e37d6f4a05d817d69f..05396b7b3ce38514ee532e9c0402ac4493bbe3f7 100644
+--- a/ios/Button/Button.swift
++++ b/ios/Button/Button.swift	
+@@ -7,6 +7,7 @@ struct Button: ExpoSwiftUI.View {
+   @ObservedObject var props: ButtonProps
+ 
+   var body: some View {
++    let isIconOnly = props.text == nil && props.systemImage != nil
+     let button = SwiftUI.Button(
+       role: props.buttonRole?.toNativeRole(),
+       action: {
+@@ -70,9 +71,17 @@ struct Button: ExpoSwiftUI.View {
+       #if compiler(>=6.2) // Xcode 26
+       switch props.variant {
+       case .glass:
+-        button.buttonStyle(.glass)
++        if isIconOnly {
++          button.buttonStyle(.glass).buttonBorderShape(.circle)
++        } else {
++          button.buttonStyle(.glass)
++        }
+       case .glassProminent:
+-        button.buttonStyle(.glassProminent)
++        if isIconOnly {
++          button.buttonStyle(.glassProminent).buttonBorderShape(.circle)
++        } else {
++          button.buttonStyle(.glassProminent)
++        }
+       default:
+         button
+       }
+@@ -84,4 +93,3 @@ struct Button: ExpoSwiftUI.View {
+     }
+   }
+ }
+-

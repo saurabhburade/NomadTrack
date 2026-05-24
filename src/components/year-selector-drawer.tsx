@@ -6,6 +6,11 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { iconStrokeWidth } from "../lib/colors";
+import { LiquidGlassLayer } from "./native/LiquidGlassLayer";
+import { NativeBottomSheet } from "./native/NativeBottomSheet";
+import { NativePicker } from "./native/NativePicker";
+import { NativeResidencyYearSheet, isNativeResidencyYearSheetAvailable } from "./native/NativeResidencyYearSheet";
+import { DrawerActionButton } from "./ui/drawer-action-button";
 import { Text } from "./ui/text";
 
 export type YearSelectorPalette = {
@@ -113,6 +118,10 @@ export function YearSelectorDrawer({
   onClose: () => void;
   onConfirm: (year: number, calendarYearMode: boolean) => void;
 }) {
+  if (Platform.OS === "ios" && isNativeResidencyYearSheetAvailable) {
+    return <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />;
+  }
+
   const insets = useSafeAreaInsets();
   const [isRendered, setIsRendered] = useState(visible);
   const [draftYear, setDraftYear] = useState(year);
@@ -187,6 +196,67 @@ export function YearSelectorDrawer({
 
   if (!isRendered) return null;
 
+  if (Platform.OS === "ios") {
+    return (
+      <NativeBottomSheet
+        contentStyle={[
+          styles.yearDrawerNativeContent,
+          {
+            backgroundColor: palette.menuGlassFill,
+            paddingBottom: Math.max(insets.bottom, 14) + 10
+          }
+        ]}
+        visible={visible}
+        onClose={onClose}
+      >
+        <View className="flex-row items-center gap-3 px-5 pt-4">
+          <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: palette.pill }}>
+            <CalendarDays size={20} color={palette.accent} strokeWidth={iconStrokeWidth} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-bold" style={{ color: palette.foreground }}>
+              Residency year
+            </Text>
+            <Text className="text-xs" style={{ color: palette.muted }} numberOfLines={1}>
+              {draftCalendarYearMode ? "Calendar year, Jan-Dec" : "India fiscal year, Apr-Mar"}
+            </Text>
+          </View>
+        </View>
+
+        <View className="mx-5 mt-5 flex-row items-center justify-between rounded-2xl p-2" style={{ backgroundColor: palette.pill }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Previous year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}>
+            <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+          </Pressable>
+          <View className="items-center">
+            <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
+              {getFiscalYearLabel(draftYear, draftCalendarYearMode)}
+            </Text>
+            <Text className="text-xs" style={{ color: palette.muted }}>
+              {draftCalendarYearMode ? "Calendar year" : "India FY"}
+            </Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Next year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}>
+            <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+          </Pressable>
+        </View>
+
+        <NativePicker
+          color={palette.accent}
+          options={["India FY", "Calendar"]}
+          selectedIndex={draftCalendarYearMode ? 1 : 0}
+          style={styles.nativePicker}
+          variant="segmented"
+          onChange={(index) => setDraftCalendarYearMode(index === 1)}
+        />
+
+        <View style={styles.drawerActionRow}>
+          <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.border} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+          <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={() => onConfirm(draftYear, draftCalendarYearMode)} />
+        </View>
+      </NativeBottomSheet>
+    );
+  }
+
   return (
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
@@ -252,17 +322,9 @@ export function YearSelectorDrawer({
             <YearModeButton selected={draftCalendarYearMode} title="Calendar" detail="Jan-Dec" palette={palette} onPress={() => setDraftCalendarYearMode(true)} />
           </View>
 
-          <View className="mx-5 mt-5 flex-row gap-3">
-            <Pressable accessibilityRole="button" accessibilityLabel="Cancel residency year selection" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
-              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Confirm residency year selection" className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={() => onConfirm(draftYear, draftCalendarYearMode)}>
-              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
-                Confirm
-              </Text>
-            </Pressable>
+          <View style={styles.drawerActionRow}>
+            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.border} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={() => onConfirm(draftYear, draftCalendarYearMode)} />
           </View>
         </Animated.View>
       </View>
@@ -276,11 +338,8 @@ export function getFiscalYearLabel(year: number, calendarYearMode: boolean) {
 }
 
 function GlassBlurLayer({ tint, intensity, style }: { tint: YearSelectorPalette["blurTint"]; intensity: number; style?: StyleProp<ViewStyle> }) {
-  if (Platform.OS === "web") {
-    return <BlurView tint={tint} intensity={intensity} style={style} />;
-  }
-
-  return <View style={[style, { backgroundColor: tint === "dark" ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.08)" }]} />;
+  if (Platform.OS === "web") return <BlurView tint={tint} intensity={intensity} style={style} />;
+  return <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={intensity} tint={tint} style={style} />;
 }
 
 function YearModeButton({ selected, title, detail, palette, onPress }: { selected: boolean; title: string; detail: string; palette: YearSelectorPalette; onPress: () => void }) {
@@ -376,6 +435,30 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -18 },
     shadowOpacity: 0.24,
     shadowRadius: 34
+  },
+  yearDrawerNativeContent: {
+    paddingHorizontal: 0,
+    paddingTop: 20
+  },
+  drawerActionRow: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    gap: 20,
+    marginHorizontal: 20,
+    marginTop: 24
+  },
+  nativeActionButton: {
+    flex: 1,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    width: 0
+  },
+  nativePicker: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    width: "auto"
   },
   yearDrawerRim: {
     ...StyleSheet.absoluteFillObject,

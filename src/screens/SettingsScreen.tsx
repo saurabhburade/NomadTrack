@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, useColorScheme, View } from "react-native";
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   CalendarDays,
-  Check,
   CheckCircle2,
-  ChevronLeft,
   ChevronRight,
   Clock3,
   CloudUpload,
@@ -17,16 +15,23 @@ import {
   Moon,
   Shield,
   Sun,
-  Timer,
   Upload,
+  UserRound,
   X,
   XCircle
 } from "lucide-react-native";
 import { Text } from "../components/ui/text";
+import { NativeDivider } from "../components/native/NativeDivider";
+import { NativeProgress } from "../components/native/NativeProgress";
+import { NativeSettingsScreen, isNativeSettingsScreenAvailable, type SettingsNativeAction } from "../components/native/NativeSettingsScreen";
+import { NativeSwitch } from "../components/native/NativeSwitch";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
+import { YearSelectorDrawer, getFiscalYearLabel, type YearSelectorPalette } from "../components/year-selector-drawer";
 import { clearAllLocalData } from "../db/database";
 import { getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import {
   clearGoogleAccessToken,
+  getGoogleAccountProfile,
   getGoogleDriveAuthSetup,
   getGoogleDriveConnectionState,
   GoogleLoginRequiredError,
@@ -35,18 +40,13 @@ import {
 } from "../services/auth/googleAuth";
 import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile } from "../services/backup/driveBackup";
 import { exportLocationCsv } from "../services/export/csvExport";
-import { startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
+import { stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
-import type { TrackingIntervalHours } from "../types/models";
 
 const appearanceOptions = [
   { value: "system", label: "System", Icon: Monitor },
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon }
-] as const;
-const fiscalYearOptions = [
-  { value: "india", label: "India FY", detail: "Apr-Mar" },
-  { value: "calendar", label: "Calendar", detail: "Jan-Dec" }
 ] as const;
 
 type BackupStatus = {
@@ -54,6 +54,7 @@ type BackupStatus = {
   message: string;
 };
 type GoogleConnectionState = Awaited<ReturnType<typeof getGoogleDriveConnectionState>>;
+type GoogleAccountProfile = Awaited<ReturnType<typeof getGoogleAccountProfile>>;
 type SettingsPalette = ReturnType<typeof getSettingsPalette>;
 type SettingsIcon = ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 type SettingsDrawer = "residency" | "appearance" | null;
@@ -81,6 +82,7 @@ export function SettingsScreen() {
   const [isBackupBusy, setIsBackupBusy] = useState(false);
   const [isResetBusy, setIsResetBusy] = useState(false);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnectionState>(defaultGoogleConnection);
+  const [googleAccount, setGoogleAccount] = useState<GoogleAccountProfile>(null);
   const [activeDrawer, setActiveDrawer] = useState<SettingsDrawer>(null);
   const [draftResidencyYear, setDraftResidencyYear] = useState(settings.residencyYearEnd);
   const [draftCalendarYearMode, setDraftCalendarYearMode] = useState(settings.calendarYearMode);
@@ -88,11 +90,17 @@ export function SettingsScreen() {
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getSettingsPalette(isDark);
   const googleDriveUnavailable = !googleAuthSetup.canUseGoogleAuth || !googleAuthRequest;
-  const trackingDetail = settings.trackingPaused ? "Paused" : "Active";
   const googleDriveDetail = getGoogleDriveDetail({
     isExpoGo: googleAuthSetup.isExpoGo,
     unavailable: googleDriveUnavailable,
     connected: googleConnection.isConnected
+  });
+  const accountTitle = getAccountTitle(googleConnection, googleAccount);
+  const accountDetail = getAccountDetail({
+    account: googleAccount,
+    connected: googleConnection.isConnected,
+    googleDriveDetail,
+    unavailable: googleDriveUnavailable
   });
 
   useEffect(() => {
@@ -109,25 +117,6 @@ export function SettingsScreen() {
   useEffect(() => {
     void refreshGoogleConnectionState();
   }, []);
-
-  async function setTrackingPaused(paused: boolean) {
-    if (paused) {
-      await updateSetting("trackingPaused", true);
-      await stopBackgroundTracking();
-      return;
-    }
-
-    const interval: TrackingIntervalHours = settings.trackingInterval === "manual" ? 4 : settings.trackingInterval;
-    if (settings.trackingInterval === "manual") {
-      await updateSetting("trackingInterval", interval);
-    }
-
-    const started = await startBackgroundTracking(interval);
-    await updateSetting("trackingPaused", !started);
-    if (!started) {
-      Alert.alert("Always location required", "Allow location access always to use Auto Track Location.");
-    }
-  }
 
   function openResidencyDrawer() {
     setDraftResidencyYear(settings.residencyYearEnd);
@@ -161,6 +150,7 @@ export function SettingsScreen() {
   async function refreshGoogleConnectionState() {
     const nextConnection = await getGoogleDriveConnectionState();
     setGoogleConnection(nextConnection);
+    setGoogleAccount(nextConnection.isConnected ? await getGoogleAccountProfile() : null);
     return nextConnection;
   }
 
@@ -335,6 +325,76 @@ export function SettingsScreen() {
     await refresh();
   }
 
+  function handleNativeAction(action: SettingsNativeAction) {
+    switch (action) {
+      case "residencyYear":
+        openResidencyDrawer();
+        break;
+      case "googleDrive":
+        connectGoogleDrive();
+        break;
+      case "backupNow":
+        void backupNow();
+        break;
+      case "restoreBackup":
+        confirmRestoreLatestBackup();
+        break;
+      case "exportCsv":
+        void exportLocationCsv();
+        break;
+      case "saveLocalBackup":
+        void writeLocalBackupFile();
+        break;
+      case "disconnectGoogle":
+        void disconnectGoogleDrive();
+        break;
+      case "backupLogout":
+        confirmBackupAndLogout();
+        break;
+      case "clearLogout":
+        confirmClearDataAndLogout();
+        break;
+    }
+  }
+
+  if (Platform.OS === "ios" && isNativeSettingsScreenAvailable) {
+    return (
+      <>
+        <NativeSettingsScreen
+          appearance={settings.appearance}
+          autoBackup={settings.autoBackup}
+          backupBusy={isBackupBusy}
+          backupStatus={backupStatus}
+          bottomPadding={Math.max(insets.bottom, 10) + 126}
+          topPadding={insets.top + 20}
+          accountDetail={accountDetail}
+          accountTitle={accountTitle}
+          calendarYearMode={settings.calendarYearMode}
+          cloudBackupEnabled={settings.cloudBackupEnabled}
+          googleConnected={googleConnection.isConnected}
+          googleDriveDetail={googleDriveDetail}
+          googleDriveUnavailable={googleDriveUnavailable}
+          palette={palette}
+          resetBusy={isResetBusy}
+          residencyYear={settings.residencyYearEnd}
+          onAction={handleNativeAction}
+          onAppearanceChange={(value: typeof settings.appearance) => void updateSetting("appearance", value)}
+          onAutoBackupChange={(value: boolean) => void updateSetting("autoBackup", value)}
+          onCloudBackupEnabledChange={(value: boolean) => void updateSetting("cloudBackupEnabled", value)}
+          onResidencyConfirm={(year: number, calendarYearMode: boolean) => void applyResidencySettings(year, calendarYearMode)}
+        />
+        <YearSelectorDrawer
+          calendarYearMode={draftCalendarYearMode}
+          palette={getSettingsYearSelectorPalette(palette)}
+          visible={activeDrawer === "residency"}
+          year={draftResidencyYear}
+          onClose={() => setActiveDrawer(null)}
+          onConfirm={(year, calendarYearMode) => void applyResidencySettings(year, calendarYearMode)}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <ScrollView
@@ -345,26 +405,19 @@ export function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         style={{ backgroundColor: palette.screen }}
       >
-        <Text className="text-3xl font-extrabold leading-[38px]" style={[styles.title, { color: palette.foreground }]}>
+        <Text className="text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
           Settings
         </Text>
 
-        <SettingsSection palette={palette} title="Tracking">
+        <SettingsSection palette={palette} title="Account">
           <SettingsGroup palette={palette}>
             <SettingsRow
-              Icon={Timer}
-              accessory={
-                <Switch
-                  ios_backgroundColor={palette.switchOff}
-                  thumbColor={settings.trackingPaused ? palette.switchOnThumb : palette.switchThumb}
-                  trackColor={{ false: palette.switchOff, true: palette.switchOn }}
-                  value={settings.trackingPaused}
-                  onValueChange={(value) => void setTrackingPaused(value)}
-                />
-              }
-              detail={trackingDetail}
+              Icon={UserRound}
+              detail={accountDetail}
+              disabled={!googleConnection.isConnected && googleDriveUnavailable}
               palette={palette}
-              title="Pause Tracking"
+              title={accountTitle}
+              onPress={googleConnection.isConnected ? undefined : connectGoogleDrive}
             />
           </SettingsGroup>
         </SettingsSection>
@@ -374,10 +427,11 @@ export function SettingsScreen() {
             <SettingsRow
               Icon={Shield}
               accessory={
-                <Switch
-                  ios_backgroundColor={palette.switchOff}
+                <NativeSwitch
+                  iosBackgroundColor={palette.switchOff}
                   thumbColor={settings.cloudBackupEnabled ? palette.switchOnThumb : palette.switchThumb}
-                  trackColor={{ false: palette.switchOff, true: palette.switchOn }}
+                  offColor={palette.switchOff}
+                  onColor={palette.switchOn}
                   value={settings.cloudBackupEnabled}
                   onValueChange={(value) => void updateSetting("cloudBackupEnabled", value)}
                 />
@@ -390,10 +444,11 @@ export function SettingsScreen() {
             <SettingsRow
               Icon={Clock3}
               accessory={
-                <Switch
-                  ios_backgroundColor={palette.switchOff}
+                <NativeSwitch
+                  iosBackgroundColor={palette.switchOff}
                   thumbColor={settings.autoBackup ? palette.switchOnThumb : palette.switchThumb}
-                  trackColor={{ false: palette.switchOff, true: palette.switchOn }}
+                  offColor={palette.switchOff}
+                  onColor={palette.switchOn}
                   value={settings.autoBackup}
                   onValueChange={(value) => void updateSetting("autoBackup", value)}
                 />
@@ -421,6 +476,7 @@ export function SettingsScreen() {
             <SettingsDivider palette={palette} />
             <SettingsRow
               Icon={Upload}
+              accessory={isBackupBusy ? <NativeProgress color={palette.tint} style={styles.rowProgress} /> : undefined}
               detail={googleDriveUnavailable ? "Needs Google Drive" : "Upload latest data"}
               disabled={isBackupBusy || googleDriveUnavailable}
               palette={palette}
@@ -430,6 +486,7 @@ export function SettingsScreen() {
             <SettingsDivider palette={palette} />
             <SettingsRow
               Icon={Download}
+              accessory={isBackupBusy ? <NativeProgress color={palette.tint} style={styles.rowProgress} /> : undefined}
               detail={googleDriveUnavailable ? "Needs Google Drive" : "Download latest backup"}
               disabled={isBackupBusy || googleDriveUnavailable}
               palette={palette}
@@ -471,9 +528,7 @@ export function SettingsScreen() {
 
         <SettingsSection palette={palette} title="Fiscal Year">
           <SettingsGroup palette={palette}>
-            <SettingsRow Icon={CalendarDays} detail={getResidencyYearLabel(settings.residencyYearEnd, settings.calendarYearMode)} palette={palette} title="Residency Year" onPress={openResidencyDrawer} />
-            <SettingsDivider palette={palette} />
-            <SettingsRow Icon={CalendarDays} detail={settings.calendarYearMode ? "Calendar year, Jan-Dec" : "India fiscal year, Apr-Mar"} palette={palette} title="Year Mode" onPress={openResidencyDrawer} />
+            <SettingsRow Icon={CalendarDays} detail={getResidencyYearDetail(settings.residencyYearEnd, settings.calendarYearMode)} palette={palette} title="Residency Year" onPress={openResidencyDrawer} />
           </SettingsGroup>
         </SettingsSection>
 
@@ -484,15 +539,13 @@ export function SettingsScreen() {
         </SettingsSection>
       </ScrollView>
 
-      <ResidencySettingsDrawer
+      <YearSelectorDrawer
         calendarYearMode={draftCalendarYearMode}
-        palette={palette}
+        palette={getSettingsYearSelectorPalette(palette)}
         visible={activeDrawer === "residency"}
         year={draftResidencyYear}
-        onCalendarYearModeChange={setDraftCalendarYearMode}
         onClose={() => setActiveDrawer(null)}
-        onConfirm={() => void applyResidencySettings(draftResidencyYear, draftCalendarYearMode)}
-        onYearChange={setDraftResidencyYear}
+        onConfirm={(year, calendarYearMode) => void applyResidencySettings(year, calendarYearMode)}
       />
       <ChoiceSettingsDrawer
         Icon={Monitor}
@@ -576,7 +629,11 @@ function SettingsRow({
         style={disabled ? styles.disabledRow : null}
         onPress={onPress}
       >
-        <View style={styles.row}>{content}</View>
+        <View style={styles.row}>
+          <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={42} tint="systemUltraThinMaterial" style={styles.rowGlassLayer} />
+          <View pointerEvents="none" style={[styles.rowGlassOverlay, { backgroundColor: palette.control, borderColor: palette.controlBorder }]} />
+          <View style={styles.rowContent}>{content}</View>
+        </View>
       </Pressable>
     );
   }
@@ -585,7 +642,7 @@ function SettingsRow({
 }
 
 function SettingsDivider({ palette }: { palette: SettingsPalette }) {
-  return <View style={[styles.divider, { backgroundColor: palette.divider }]} />;
+  return <NativeDivider color={palette.divider} style={styles.divider} />;
 }
 
 function SettingsDrawerShell({
@@ -679,13 +736,14 @@ function SettingsDrawerShell({
             style={[
               styles.settingsDrawer,
               {
-                backgroundColor: palette.drawer,
                 borderColor: palette.groupBorder,
                 paddingBottom: Math.max(insets.bottom, 14) + 6
               },
               drawerStyle
             ]}
           >
+            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={78} tint="systemThinMaterial" style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+            <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.drawer }]} />
             <View style={styles.drawerHandleTouchArea}>
               <View style={[styles.drawerHandle, { backgroundColor: palette.drawerHandle }]} />
             </View>
@@ -718,167 +776,79 @@ function ChoiceSettingsDrawer({
   onClose: () => void;
   onSelect: (value: string) => void;
 }) {
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === selectedValue)
+  );
+
   return (
     <SettingsDrawerShell palette={palette} visible={visible} onClose={onClose}>
-          <View style={styles.drawerHeader}>
-            <View style={[styles.drawerIcon, { backgroundColor: palette.control }]}>
-              <Icon size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </View>
-            <View style={styles.drawerHeaderText}>
-              <Text className="text-lg font-extrabold leading-6" style={[styles.drawerTitle, { color: palette.foreground }]}>
-                {title}
-              </Text>
-              <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
-                {detail}
-              </Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss ${title}`} hitSlop={8} style={[styles.drawerCloseButton, { backgroundColor: palette.control }]} onPress={onClose}>
-              <X size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-          </View>
+      <View style={styles.drawerHeader}>
+        <View style={[styles.drawerIcon, { backgroundColor: palette.control }]}>
+          <Icon size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+        </View>
+        <View style={styles.drawerHeaderText}>
+          <Text className="text-lg font-extrabold leading-6" style={[styles.drawerTitle, { color: palette.foreground }]}>
+            {title}
+          </Text>
+          <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
+            {detail}
+          </Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss ${title}`} hitSlop={8} style={[styles.drawerCloseButton, { backgroundColor: palette.control }]} onPress={onClose}>
+          <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={44} tint="systemUltraThinMaterial" tintColor={palette.control} style={StyleSheet.absoluteFill} />
+          <X size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
+        </Pressable>
+      </View>
 
-          <View style={styles.drawerOptionList}>
-            {options.map((option) => {
-              const selected = option.value === selectedValue;
-              const OptionIcon = option.Icon;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="button"
-                  accessibilityState={selected ? { selected: true } : undefined}
-                  style={[
-                    styles.drawerOption,
-                    {
-                      backgroundColor: selected ? palette.selectedControl : palette.control,
-                      borderColor: selected ? palette.tint : palette.controlBorder
-                    }
-                  ]}
-                  onPress={() => onSelect(option.value)}
-                >
-                  {OptionIcon ? <OptionIcon size={18} color={selected ? palette.tint : palette.muted} strokeWidth={iconStrokeWidth} /> : null}
-                  <View style={styles.drawerOptionCopy}>
-                    <Text className="text-sm font-bold leading-5" style={{ color: palette.foreground }}>
-                      {option.label}
-                    </Text>
-                    {option.detail ? (
-                      <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
-                        {option.detail}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={[styles.radioOuter, { borderColor: selected ? palette.tint : palette.controlBorder }]}>
-                    {selected ? <View style={[styles.radioInner, { backgroundColor: palette.tint }]} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+      <ChoiceTabs options={options} palette={palette} selectedIndex={selectedIndex} selectedValue={selectedValue} onSelect={onSelect} />
     </SettingsDrawerShell>
   );
 }
 
-function ResidencySettingsDrawer({
-  calendarYearMode,
+function ChoiceTabs({
+  options,
   palette,
-  visible,
-  year,
-  onCalendarYearModeChange,
-  onClose,
-  onConfirm,
-  onYearChange
+  selectedIndex,
+  selectedValue,
+  onSelect
 }: {
-  calendarYearMode: boolean;
+  options: ChoiceOption[];
   palette: SettingsPalette;
-  visible: boolean;
-  year: number;
-  onCalendarYearModeChange: (value: boolean) => void;
-  onClose: () => void;
-  onConfirm: () => void;
-  onYearChange: (value: number) => void;
+  selectedIndex: number;
+  selectedValue: string;
+  onSelect: (value: string) => void;
 }) {
   return (
-    <SettingsDrawerShell palette={palette} visible={visible} onClose={onClose}>
-          <View style={styles.drawerHeader}>
-            <View style={[styles.drawerIcon, { backgroundColor: palette.control }]}>
-              <CalendarDays size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </View>
-            <View style={styles.drawerHeaderText}>
-              <Text className="text-lg font-extrabold leading-6" style={[styles.drawerTitle, { color: palette.foreground }]}>
-                Residency Year
-              </Text>
-              <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
-                {calendarYearMode ? "Calendar year, Jan-Dec" : "India fiscal year, Apr-Mar"}
-              </Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Dismiss residency year" hitSlop={8} style={[styles.drawerCloseButton, { backgroundColor: palette.control }]} onPress={onClose}>
-              <X size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-          </View>
-
-          <View style={[styles.drawerYearStepper, { backgroundColor: palette.control, borderColor: palette.controlBorder }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous year" hitSlop={8} style={styles.stepperButton} onPress={() => onYearChange(Math.max(2000, year - 1))}>
-              <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-            <View style={styles.yearLabelWrap}>
-              <Text className="text-xl font-extrabold leading-7" adjustsFontSizeToFit numberOfLines={1} style={{ color: palette.foreground }}>
-                {getResidencyYearLabel(year, calendarYearMode)}
-              </Text>
-              <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
-                {calendarYearMode ? "Calendar year" : "India FY"}
-              </Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next year" hitSlop={8} style={styles.stepperButton} onPress={() => onYearChange(Math.min(2100, year + 1))}>
-              <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-          </View>
-
-          <View style={styles.drawerOptionList}>
-            {fiscalYearOptions.map((option) => {
-              const selected = option.value === "calendar" ? calendarYearMode : !calendarYearMode;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="button"
-                  accessibilityState={selected ? { selected: true } : undefined}
-                  style={[
-                    styles.drawerOption,
-                    {
-                      backgroundColor: selected ? palette.selectedControl : palette.control,
-                      borderColor: selected ? palette.tint : palette.controlBorder
-                    }
-                  ]}
-                  onPress={() => onCalendarYearModeChange(option.value === "calendar")}
-                >
-                  <View style={styles.drawerOptionCopy}>
-                    <Text className="text-sm font-bold leading-5" style={{ color: palette.foreground }}>
-                      {option.label}
-                    </Text>
-                    <Text className="text-xs font-medium leading-[17px]" numberOfLines={1} style={{ color: palette.muted }}>
-                      {option.detail}
-                    </Text>
-                  </View>
-                  <View style={[styles.radioOuter, { borderColor: selected ? palette.tint : palette.controlBorder }]}>
-                    {selected ? <View style={[styles.radioInner, { backgroundColor: palette.tint }]} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.drawerActions}>
-            <Pressable accessibilityRole="button" style={[styles.secondaryAction, { backgroundColor: palette.control, borderColor: palette.controlBorder }]} onPress={onClose}>
-              <Text className="text-sm font-bold leading-5" style={{ color: palette.foreground }}>
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" style={[styles.primaryAction, { backgroundColor: palette.tint }]} onPress={onConfirm}>
-              <Check size={18} color={palette.tintForeground} strokeWidth={iconStrokeWidth} />
-              <Text className="text-sm font-bold leading-5" style={{ color: palette.tintForeground }}>
-                Confirm
-              </Text>
-            </Pressable>
-          </View>
-    </SettingsDrawerShell>
+    <View style={[styles.choiceTabs, { backgroundColor: palette.choiceTabsTrack, borderColor: palette.choiceTabsBorder }]}>
+      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={46} tint="systemUltraThinMaterial" tintColor={palette.control} style={StyleSheet.absoluteFill} />
+      {options.map((option, index) => {
+        const selected = index === selectedIndex;
+        const OptionIcon = option.Icon;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityLabel={option.label}
+            accessibilityRole="button"
+            accessibilityState={selected ? { selected: true } : undefined}
+            hitSlop={4}
+            style={[styles.choiceTab, selected && { backgroundColor: palette.choiceTabsActive, borderColor: palette.choiceTabsActiveBorder }]}
+            onPress={() => onSelect(option.value ?? selectedValue)}
+          >
+            {OptionIcon ? <OptionIcon size={22} color={selected ? palette.choiceTabsSelectedText : palette.choiceTabsMutedText} strokeWidth={iconStrokeWidth} /> : null}
+            <Text
+              className="text-xs font-semibold leading-[17px]"
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              numberOfLines={1}
+              style={[styles.choiceTabLabel, { color: selected ? palette.choiceTabsSelectedText : palette.choiceTabsMutedText }]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -899,9 +869,9 @@ function BackupStatusMessage({ palette, status }: { palette: SettingsPalette; st
   );
 }
 
-function getResidencyYearLabel(year: number, calendarYearMode: boolean) {
-  if (calendarYearMode) return String(year);
-  return `FY ${String(year - 1).slice(-2)}-${String(year).slice(-2)}`;
+function getResidencyYearDetail(year: number, calendarYearMode: boolean) {
+  const modeLabel = calendarYearMode ? "Calendar year, Jan-Dec" : "India fiscal year, Apr-Mar";
+  return `${getFiscalYearLabel(year, calendarYearMode)}, ${modeLabel}`;
 }
 
 function getAppearanceLabel(value: "system" | "light" | "dark") {
@@ -913,6 +883,51 @@ function getGoogleDriveDetail({ connected, isExpoGo, unavailable }: { connected:
   if (isExpoGo) return "Needs development build";
   if (unavailable) return "OAuth setup missing";
   return connected ? "Connected" : "Not connected";
+}
+
+function getAccountTitle(connection: GoogleConnectionState, account: GoogleAccountProfile) {
+  if (!connection.isConnected) return "Login Account";
+  return account?.name ?? "Google Account";
+}
+
+function getAccountDetail({
+  account,
+  connected,
+  googleDriveDetail,
+  unavailable
+}: {
+  account: GoogleAccountProfile;
+  connected: boolean;
+  googleDriveDetail: string;
+  unavailable: boolean;
+}) {
+  if (connected) return account?.email ?? `Signed in - ${googleDriveDetail}`;
+  if (unavailable) return "Google sign-in unavailable";
+  return "Connect Google Drive to sign in";
+}
+
+function getSettingsYearSelectorPalette(palette: SettingsPalette): YearSelectorPalette {
+  const isDark = palette.screen === "#000000";
+
+  return {
+    foreground: palette.foreground,
+    muted: palette.muted,
+    border: palette.controlBorder,
+    card: palette.drawer,
+    pill: palette.control,
+    accent: palette.tint,
+    accentForeground: palette.tintForeground,
+    blurTint: isDark ? "dark" : "light",
+    drawerBackdrop: palette.drawerBackdrop,
+    glassFill: palette.control,
+    menuGlassFill: palette.drawer,
+    glassHighlight: isDark ? "transparent" : "rgba(255,255,255,0.82)",
+    glassLowlight: isDark ? "transparent" : "rgba(0,0,0,0.04)",
+    glassBorder: palette.controlBorder,
+    glassBorderActive: isDark ? "rgba(255,255,255,0.38)" : "rgba(0,0,0,0.18)",
+    glassRim: palette.groupBorder,
+    glassShadow: "#000000"
+  };
 }
 
 function formatBackupTime(value: string) {
@@ -928,20 +943,20 @@ function getSettingsPalette(isDark: boolean) {
   return {
     screen: neutral.backgroundPrimary,
     group: isDark ? "#1c1c1e" : "#f4f4f5",
-    groupBorder: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    groupBorder: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.04)",
     control: isDark ? "#2c2c2e" : "#ffffff",
-    controlBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
-    divider: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)",
+    controlBorder: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+    divider: isDark ? "rgba(84,84,88,0.56)" : "rgba(0,0,0,0.1)",
     foreground: neutral.foreground,
     muted: neutral.foregroundSecondary,
     section: neutral.foregroundSecondary,
     icon: neutral.foreground,
     chevron: neutral.foregroundTertiary,
     disabled: isDark ? "#5f5f63" : "#a7a7ad",
-    switchOff: isDark ? "#3a3a3c" : "#d1d1d6",
-    switchOn: neutral.primary,
-    switchThumb: isDark ? neutral.primaryForeground : "#ffffff",
-    switchOnThumb: neutral.primaryForeground,
+    switchOff: isDark ? "#636366" : "#d1d1d6",
+    switchOn: isDark ? "#30d158" : "#34c759",
+    switchThumb: "#ffffff",
+    switchOnThumb: "#ffffff",
     tint: neutral.primary,
     tintForeground: neutral.primaryForeground,
     danger: isDark ? "#ff453a" : statusColors.error,
@@ -953,7 +968,12 @@ function getSettingsPalette(isDark: boolean) {
     drawerBackdrop: isDark ? "rgba(0,0,0,0.58)" : "rgba(0,0,0,0.26)",
     drawer: isDark ? "#1c1c1e" : "#ffffff",
     drawerHandle: isDark ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.18)",
-    selectedControl: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"
+    choiceTabsTrack: isDark ? "rgba(44,44,46,0.92)" : "rgba(0,0,0,0.055)",
+    choiceTabsBorder: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
+    choiceTabsActive: isDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.94)",
+    choiceTabsActiveBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.04)",
+    choiceTabsMutedText: neutral.foregroundSecondary,
+    choiceTabsSelectedText: neutral.foreground
   };
 }
 
@@ -962,11 +982,6 @@ const styles = StyleSheet.create({
     gap: 22,
     paddingHorizontal: 20,
     paddingTop: 20
-  },
-  title: {
-    fontSize: 30,
-    letterSpacing: 0,
-    lineHeight: 38
   },
   section: {
     gap: 10
@@ -985,11 +1000,30 @@ const styles = StyleSheet.create({
   },
   row: {
     alignItems: "center",
+    borderCurve: "continuous",
+    borderRadius: 0,
     flexDirection: "row",
     gap: 14,
     minHeight: 68,
+    overflow: "hidden",
     paddingHorizontal: 20,
     paddingVertical: 12
+  },
+  rowContent: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 14,
+    minWidth: 0,
+    zIndex: 1
+  },
+  rowGlassLayer: {
+    ...StyleSheet.absoluteFillObject
+  },
+  rowGlassOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: StyleSheet.hairlineWidth,
+    opacity: 0.26
   },
   disabledRow: {
     opacity: 0.62
@@ -1014,24 +1048,20 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 2
   },
+  rowProgress: {
+    height: 28,
+    width: 28
+  },
   divider: {
     height: StyleSheet.hairlineWidth,
     marginLeft: 64
   },
-  stepperButton: {
-    alignItems: "center",
-    height: 40,
-    justifyContent: "center",
-    width: 40
-  },
-  yearLabelWrap: {
-    alignItems: "center",
-    flex: 1,
-    minWidth: 0
-  },
   modalRoot: {
     flex: 1,
     justifyContent: "flex-end"
+  },
+  noPointerEvents: {
+    pointerEvents: "none"
   },
   settingsDrawer: {
     borderCurve: "continuous",
@@ -1078,6 +1108,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 36,
     justifyContent: "center",
+    overflow: "hidden",
     width: 36
   },
   drawerTitle: {
@@ -1085,73 +1116,33 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 24
   },
-  drawerOptionList: {
-    gap: 9,
-    width: "100%"
-  },
-  drawerOption: {
-    alignItems: "center",
+  choiceTabs: {
     borderCurve: "continuous",
-    borderRadius: 18,
+    borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 12,
-    minHeight: 58,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    width: "100%"
+    gap: 6,
+    overflow: "hidden",
+    padding: 5
   },
-  drawerOptionCopy: {
-    flex: 1,
-    minWidth: 0
-  },
-  radioOuter: {
+  choiceTab: {
     alignItems: "center",
+    borderCurve: "continuous",
+    borderColor: "transparent",
     borderRadius: 999,
-    borderWidth: 1.5,
-    height: 20,
+    borderWidth: 1,
+    flex: 1,
+    gap: 5,
     justifyContent: "center",
-    width: 20
+    minHeight: 58,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 7
   },
-  radioInner: {
-    borderRadius: 999,
-    height: 9,
-    width: 9
-  },
-  drawerYearStepper: {
-    alignItems: "center",
-    borderCurve: "continuous",
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-    minHeight: 68,
-    paddingHorizontal: 12
-  },
-  drawerActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16
-  },
-  secondaryAction: {
-    alignItems: "center",
-    borderCurve: "continuous",
-    borderRadius: 17,
-    borderWidth: 1,
-    flex: 1,
-    height: 48,
-    justifyContent: "center"
-  },
-  primaryAction: {
-    alignItems: "center",
-    borderCurve: "continuous",
-    borderRadius: 17,
-    flex: 1,
-    flexDirection: "row",
-    gap: 7,
-    height: 48,
-    justifyContent: "center"
+  choiceTabLabel: {
+    fontSize: 12,
+    letterSpacing: 0,
+    lineHeight: 17
   },
   statusMessage: {
     alignItems: "flex-start",

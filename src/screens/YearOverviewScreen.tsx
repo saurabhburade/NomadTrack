@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, useColorScheme, useWindowDimensions, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { Platform, ScrollView, StyleSheet, useColorScheme, useWindowDimensions, View } from "react-native";
+import { useRouter } from "expo-router";
 import { CalendarDays, ChevronLeft, Clock3, Crown, Map as MapIcon, type LucideIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "../components/ui/text";
+import { NativeDashboardHeaderActions } from "../components/native/NativeDashboardHeaderActions";
 import { HeaderGlassButton, YearSelectorDrawer } from "../components/year-selector-drawer";
 import { compactNumber } from "../lib/utils";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
@@ -15,11 +15,10 @@ import {
   getResidencyYearWindow
 } from "../services/calculations/residencyYear";
 import { useAppStore } from "../store/appStore";
-import type { RootTabParamList } from "../navigation/AppNavigator";
 
-type YearOverviewNavigation = BottomTabNavigationProp<RootTabParamList, "YearOverview">;
 type Palette = ReturnType<typeof getPalette>;
 type MonthSlot = { key: string; iso?: string };
+const dashboardHeaderTopSpacing = 20;
 
 const monthNames = [
   "January",
@@ -37,7 +36,7 @@ const monthNames = [
 ];
 
 export function YearOverviewScreen() {
-  const navigation = useNavigation<YearOverviewNavigation>();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const { width } = useWindowDimensions();
@@ -104,12 +103,12 @@ export function YearOverviewScreen() {
   ];
 
   function closeOverview() {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    if (router.canGoBack()) {
+      router.back();
       return;
     }
 
-    navigation.navigate("Dashboard");
+    router.replace("/");
   }
 
   async function saveResidencyYear(year: number, calendarYearMode: boolean) {
@@ -138,7 +137,7 @@ export function YearOverviewScreen() {
           {
             paddingBottom: Math.max(insets.bottom, 10) + 144,
             paddingHorizontal: horizontalPadding,
-            paddingTop: insets.top + 8
+            paddingTop: insets.top + dashboardHeaderTopSpacing
           }
         ]}
         style={{ backgroundColor: palette.screen }}
@@ -151,22 +150,37 @@ export function YearOverviewScreen() {
             <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
               Overview
             </Text>
-            <View style={styles.headerActions}>
-              <HeaderGlassButton
-                accessibilityLabel="Change residency year"
-                active={isYearSelectorOpen}
-                palette={palette}
-                style={styles.yearHeaderButton}
-                onPress={() => setIsYearSelectorOpen(true)}
-              >
-                <Text className="text-lg font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
-                  {yearLabel}
-                </Text>
-              </HeaderGlassButton>
-              <HeaderGlassButton accessibilityLabel="Back to dashboard" palette={palette} style={styles.iconHeaderButton} onPress={closeOverview}>
-                <ChevronLeft size={27} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-              </HeaderGlassButton>
-            </View>
+            {Platform.OS === "ios" ? (
+              <NativeDashboardHeaderActions
+                accessibilityLabel="Overview header actions"
+                color={palette.foreground}
+                fiscalYearLabel={yearLabel}
+                menuActions={[]}
+                trailingAction={{
+                  accessibilityLabel: "Back to dashboard",
+                  systemImage: "chevron.left",
+                  onPress: closeOverview
+                }}
+                onYearPress={() => setIsYearSelectorOpen(true)}
+              />
+            ) : (
+              <View style={styles.headerActions}>
+                <HeaderGlassButton
+                  accessibilityLabel="Change residency year"
+                  active={isYearSelectorOpen}
+                  palette={palette}
+                  style={styles.yearHeaderButton}
+                  onPress={() => setIsYearSelectorOpen(true)}
+                >
+                  <Text className="text-lg font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
+                    {yearLabel}
+                  </Text>
+                </HeaderGlassButton>
+                <HeaderGlassButton accessibilityLabel="Back to dashboard" palette={palette} style={styles.iconHeaderButton} onPress={closeOverview}>
+                  <ChevronLeft size={27} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+                </HeaderGlassButton>
+              </View>
+            )}
           </View>
 
           <View style={[styles.legendGrid, { columnGap: legendGap, rowGap: 16 }]}>

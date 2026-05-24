@@ -15,6 +15,28 @@
 		C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */; };
 		C0DEF002C0DEF002C0DEF002 /* ForceQuitLocationModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */; };
 		C0DEF005C0DEF005C0DEF005 /* LogTodayCountryIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */; };
+		C0DEF007C0DEF007C0DEF007 /* DashboardToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF009C0DEF009C0DEF009 /* DashboardToolbarView.swift */; };
+		C0DEF008C0DEF008C0DEF008 /* DashboardToolbarViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF00AC0DEF00AC0DEF00A /* DashboardToolbarViewBridge.m */; };
+		C0DEF00BC0DEF00BC0DEF00B /* ResidencyYearSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF00DC0DEF00DC0DEF00D /* ResidencyYearSheetView.swift */; };
+		C0DEF00CC0DEF00CC0DEF00C /* ResidencyYearSheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF00EC0DEF00EC0DEF00E /* ResidencyYearSheetViewBridge.m */; };
+		C0DEF010C0DEF010C0DEF010 /* AutomationGuideSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF012C0DEF012C0DEF012 /* AutomationGuideSheetView.swift */; };
+		C0DEF011C0DEF011C0DEF011 /* AutomationGuideSheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF013C0DEF013C0DEF013 /* AutomationGuideSheetViewBridge.m */; };
+		C0DEF014C0DEF014C0DEF014 /* ReportPreviewSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF016C0DEF016C0DEF016 /* ReportPreviewSheetView.swift */; };
+		C0DEF015C0DEF015C0DEF015 /* ReportPreviewSheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF017C0DEF017C0DEF017 /* ReportPreviewSheetViewBridge.m */; };
+		C0DEF018C0DEF018C0DEF018 /* SettingsScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF01AC0DEF01AC0DEF01A /* SettingsScreenView.swift */; };
+		C0DEF019C0DEF019C0DEF019 /* SettingsScreenViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF01BC0DEF01BC0DEF01B /* SettingsScreenViewBridge.m */; };
+		C0DEF020C0DEF020C0DEF020 /* CalendarMonthButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF022C0DEF022C0DEF022 /* CalendarMonthButtonView.swift */; };
+		C0DEF021C0DEF021C0DEF021 /* CalendarMonthButtonViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF023C0DEF023C0DEF023 /* CalendarMonthButtonViewBridge.m */; };
+		C0DEF024C0DEF024C0DEF024 /* EditDaySheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF026C0DEF026C0DEF026 /* EditDaySheetView.swift */; };
+		C0DEF025C0DEF025C0DEF025 /* EditDaySheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF027C0DEF027C0DEF027 /* EditDaySheetViewBridge.m */; };
+		C0DEF028C0DEF028C0DEF028 /* CalendarToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF02AC0DEF02AC0DEF02A /* CalendarToolbarView.swift */; };
+		C0DEF029C0DEF029C0DEF029 /* CalendarToolbarViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF02BC0DEF02BC0DEF02B /* CalendarToolbarViewBridge.m */; };
+		C0DEF02CC0DEF02CC0DEF02C /* MonthYearSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF02EC0DEF02EC0DEF02E /* MonthYearSheetView.swift */; };
+		C0DEF02DC0DEF02DC0DEF02D /* MonthYearSheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF02FC0DEF02FC0DEF02F /* MonthYearSheetViewBridge.m */; };
+		C0DEF030C0DEF030C0DEF030 /* ManualEntrySheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF032C0DEF032C0DEF032 /* ManualEntrySheetView.swift */; };
+		C0DEF031C0DEF031C0DEF031 /* ManualEntrySheetViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF033C0DEF033C0DEF033 /* ManualEntrySheetViewBridge.m */; };
+		C0DEF034C0DEF034C0DEF034 /* CalendarMonthGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF036C0DEF036C0DEF036 /* CalendarMonthGridView.swift */; };
+		C0DEF035C0DEF035C0DEF035 /* CalendarMonthGridViewBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF037C0DEF037C0DEF037 /* CalendarMonthGridViewBridge.m */; };
 		C94A2E5CCA2E885F7D86C992 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C53743FEC5B0AE65FD7D662 /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
@@ -31,6 +53,28 @@
 		C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ForceQuitLocationModule.swift; path = TravelNRITracker/ForceQuitLocationModule.swift; sourceTree = "<group>"; };
 		C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ForceQuitLocationModuleBridge.m; path = TravelNRITracker/ForceQuitLocationModuleBridge.m; sourceTree = "<group>"; };
 		C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogTodayCountryIntent.swift; path = TravelNRITracker/LogTodayCountryIntent.swift; sourceTree = "<group>"; };
+		C0DEF009C0DEF009C0DEF009 /* DashboardToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardToolbarView.swift; path = TravelNRITracker/DashboardToolbarView.swift; sourceTree = "<group>"; };
+		C0DEF00AC0DEF00AC0DEF00A /* DashboardToolbarViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DashboardToolbarViewBridge.m; path = TravelNRITracker/DashboardToolbarViewBridge.m; sourceTree = "<group>"; };
+		C0DEF00DC0DEF00DC0DEF00D /* ResidencyYearSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ResidencyYearSheetView.swift; path = TravelNRITracker/ResidencyYearSheetView.swift; sourceTree = "<group>"; };
+		C0DEF00EC0DEF00EC0DEF00E /* ResidencyYearSheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ResidencyYearSheetViewBridge.m; path = TravelNRITracker/ResidencyYearSheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF012C0DEF012C0DEF012 /* AutomationGuideSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AutomationGuideSheetView.swift; path = TravelNRITracker/AutomationGuideSheetView.swift; sourceTree = "<group>"; };
+		C0DEF013C0DEF013C0DEF013 /* AutomationGuideSheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AutomationGuideSheetViewBridge.m; path = TravelNRITracker/AutomationGuideSheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF016C0DEF016C0DEF016 /* ReportPreviewSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReportPreviewSheetView.swift; path = TravelNRITracker/ReportPreviewSheetView.swift; sourceTree = "<group>"; };
+		C0DEF017C0DEF017C0DEF017 /* ReportPreviewSheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ReportPreviewSheetViewBridge.m; path = TravelNRITracker/ReportPreviewSheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF01AC0DEF01AC0DEF01A /* SettingsScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsScreenView.swift; path = TravelNRITracker/SettingsScreenView.swift; sourceTree = "<group>"; };
+		C0DEF01BC0DEF01BC0DEF01B /* SettingsScreenViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = SettingsScreenViewBridge.m; path = TravelNRITracker/SettingsScreenViewBridge.m; sourceTree = "<group>"; };
+		C0DEF022C0DEF022C0DEF022 /* CalendarMonthButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarMonthButtonView.swift; path = TravelNRITracker/CalendarMonthButtonView.swift; sourceTree = "<group>"; };
+		C0DEF023C0DEF023C0DEF023 /* CalendarMonthButtonViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = CalendarMonthButtonViewBridge.m; path = TravelNRITracker/CalendarMonthButtonViewBridge.m; sourceTree = "<group>"; };
+		C0DEF026C0DEF026C0DEF026 /* EditDaySheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EditDaySheetView.swift; path = TravelNRITracker/EditDaySheetView.swift; sourceTree = "<group>"; };
+		C0DEF027C0DEF027C0DEF027 /* EditDaySheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = EditDaySheetViewBridge.m; path = TravelNRITracker/EditDaySheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF02AC0DEF02AC0DEF02A /* CalendarToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarToolbarView.swift; path = TravelNRITracker/CalendarToolbarView.swift; sourceTree = "<group>"; };
+		C0DEF02BC0DEF02BC0DEF02B /* CalendarToolbarViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = CalendarToolbarViewBridge.m; path = TravelNRITracker/CalendarToolbarViewBridge.m; sourceTree = "<group>"; };
+		C0DEF02EC0DEF02EC0DEF02E /* MonthYearSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MonthYearSheetView.swift; path = TravelNRITracker/MonthYearSheetView.swift; sourceTree = "<group>"; };
+		C0DEF02FC0DEF02FC0DEF02F /* MonthYearSheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = MonthYearSheetViewBridge.m; path = TravelNRITracker/MonthYearSheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF032C0DEF032C0DEF032 /* ManualEntrySheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ManualEntrySheetView.swift; path = TravelNRITracker/ManualEntrySheetView.swift; sourceTree = "<group>"; };
+		C0DEF033C0DEF033C0DEF033 /* ManualEntrySheetViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ManualEntrySheetViewBridge.m; path = TravelNRITracker/ManualEntrySheetViewBridge.m; sourceTree = "<group>"; };
+		C0DEF036C0DEF036C0DEF036 /* CalendarMonthGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarMonthGridView.swift; path = TravelNRITracker/CalendarMonthGridView.swift; sourceTree = "<group>"; };
+		C0DEF037C0DEF037C0DEF037 /* CalendarMonthGridViewBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = CalendarMonthGridViewBridge.m; path = TravelNRITracker/CalendarMonthGridViewBridge.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		ED9838B776239018FC6246CF /* libPods-TravelNRITracker.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TravelNRITracker.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = TravelNRITracker/AppDelegate.swift; sourceTree = "<group>"; };
@@ -54,6 +98,28 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				C0DEF009C0DEF009C0DEF009 /* DashboardToolbarView.swift */,
+				C0DEF00AC0DEF00AC0DEF00A /* DashboardToolbarViewBridge.m */,
+				C0DEF00DC0DEF00DC0DEF00D /* ResidencyYearSheetView.swift */,
+				C0DEF00EC0DEF00EC0DEF00E /* ResidencyYearSheetViewBridge.m */,
+				C0DEF012C0DEF012C0DEF012 /* AutomationGuideSheetView.swift */,
+				C0DEF013C0DEF013C0DEF013 /* AutomationGuideSheetViewBridge.m */,
+				C0DEF016C0DEF016C0DEF016 /* ReportPreviewSheetView.swift */,
+				C0DEF017C0DEF017C0DEF017 /* ReportPreviewSheetViewBridge.m */,
+				C0DEF01AC0DEF01AC0DEF01A /* SettingsScreenView.swift */,
+				C0DEF01BC0DEF01BC0DEF01B /* SettingsScreenViewBridge.m */,
+				C0DEF022C0DEF022C0DEF022 /* CalendarMonthButtonView.swift */,
+				C0DEF023C0DEF023C0DEF023 /* CalendarMonthButtonViewBridge.m */,
+				C0DEF026C0DEF026C0DEF026 /* EditDaySheetView.swift */,
+				C0DEF027C0DEF027C0DEF027 /* EditDaySheetViewBridge.m */,
+				C0DEF02AC0DEF02AC0DEF02A /* CalendarToolbarView.swift */,
+				C0DEF02BC0DEF02BC0DEF02B /* CalendarToolbarViewBridge.m */,
+				C0DEF02EC0DEF02EC0DEF02E /* MonthYearSheetView.swift */,
+				C0DEF02FC0DEF02FC0DEF02F /* MonthYearSheetViewBridge.m */,
+				C0DEF032C0DEF032C0DEF032 /* ManualEntrySheetView.swift */,
+				C0DEF033C0DEF033C0DEF033 /* ManualEntrySheetViewBridge.m */,
+				C0DEF036C0DEF036C0DEF036 /* CalendarMonthGridView.swift */,
+				C0DEF037C0DEF037C0DEF037 /* CalendarMonthGridViewBridge.m */,
 				C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */,
 				C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */,
 				C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */,
@@ -351,6 +417,28 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				C0DEF007C0DEF007C0DEF007 /* DashboardToolbarView.swift in Sources */,
+				C0DEF008C0DEF008C0DEF008 /* DashboardToolbarViewBridge.m in Sources */,
+				C0DEF00BC0DEF00BC0DEF00B /* ResidencyYearSheetView.swift in Sources */,
+				C0DEF00CC0DEF00CC0DEF00C /* ResidencyYearSheetViewBridge.m in Sources */,
+				C0DEF010C0DEF010C0DEF010 /* AutomationGuideSheetView.swift in Sources */,
+				C0DEF011C0DEF011C0DEF011 /* AutomationGuideSheetViewBridge.m in Sources */,
+				C0DEF014C0DEF014C0DEF014 /* ReportPreviewSheetView.swift in Sources */,
+				C0DEF015C0DEF015C0DEF015 /* ReportPreviewSheetViewBridge.m in Sources */,
+				C0DEF018C0DEF018C0DEF018 /* SettingsScreenView.swift in Sources */,
+				C0DEF020C0DEF020C0DEF020 /* CalendarMonthButtonView.swift in Sources */,
+				C0DEF021C0DEF021C0DEF021 /* CalendarMonthButtonViewBridge.m in Sources */,
+				C0DEF024C0DEF024C0DEF024 /* EditDaySheetView.swift in Sources */,
+				C0DEF025C0DEF025C0DEF025 /* EditDaySheetViewBridge.m in Sources */,
+				C0DEF028C0DEF028C0DEF028 /* CalendarToolbarView.swift in Sources */,
+				C0DEF029C0DEF029C0DEF029 /* CalendarToolbarViewBridge.m in Sources */,
+				C0DEF02CC0DEF02CC0DEF02C /* MonthYearSheetView.swift in Sources */,
+				C0DEF02DC0DEF02DC0DEF02D /* MonthYearSheetViewBridge.m in Sources */,
+				C0DEF030C0DEF030C0DEF030 /* ManualEntrySheetView.swift in Sources */,
+				C0DEF031C0DEF031C0DEF031 /* ManualEntrySheetViewBridge.m in Sources */,
+				C0DEF034C0DEF034C0DEF034 /* CalendarMonthGridView.swift in Sources */,
+				C0DEF035C0DEF035C0DEF035 /* CalendarMonthGridViewBridge.m in Sources */,
+				C0DEF019C0DEF019C0DEF019 /* SettingsScreenViewBridge.m in Sources */,
 				C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */,
 				C0DEF002C0DEF002C0DEF002 /* ForceQuitLocationModuleBridge.m in Sources */,
 				C0DEF005C0DEF005C0DEF005 /* LogTodayCountryIntent.swift in Sources */,

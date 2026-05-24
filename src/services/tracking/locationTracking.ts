@@ -107,7 +107,11 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const payload = data as { locations?: Location.LocationObject[] };
   const locations = payload.locations ?? [];
   for (const location of locations) {
-    await handleAutomaticLocation(location);
+    try {
+      await handleAutomaticLocation(location);
+    } catch (taskError) {
+      console.warn(`[location] Background location task failed: ${getErrorMessage(taskError)}`);
+    }
   }
 });
 
@@ -423,6 +427,10 @@ function loadNativeBackgroundGeolocation() {
 
 function isDebugBuild() {
   return typeof __DEV__ !== "undefined" && __DEV__;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 registerNativeHeadlessTask();

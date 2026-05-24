@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Alert, AppState, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share as NativeShare, StyleSheet, Switch, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { Alert, AppState, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share as NativeShare, StyleSheet, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { BlurView } from "expo-blur";
 import {
   AlertTriangle,
@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Clock3,
   FileText,
-  Info,
   MoreHorizontal,
   RefreshCw,
   Share
@@ -20,6 +19,15 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "../components/ui/text";
+import { BlurReplaceText } from "../components/ui/blur-replace-text";
+import { DrawerActionButton } from "../components/ui/drawer-action-button";
+import { NativeDashboardHeaderActions } from "../components/native/NativeDashboardHeaderActions";
+import { NativeGlassButton } from "../components/native/NativeGlassButton";
+import { NativeSwitch } from "../components/native/NativeSwitch";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
+import { NativeAutomationGuideSheet, isNativeAutomationGuideSheetAvailable } from "../components/native/NativeAutomationGuideSheet";
+import { NativeResidencyYearSheet, isNativeResidencyYearSheetAvailable } from "../components/native/NativeResidencyYearSheet";
+import { NativeReportPreviewSheet, isNativeReportPreviewSheetAvailable } from "../components/native/NativeReportPreviewSheet";
 import { distributionColors, getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import { compactNumber, formatRelativeTime } from "../lib/utils";
 import { formatResidencyYearLabel, getResidencyYearDayCount } from "../services/calculations/residencyYear";
@@ -27,12 +35,11 @@ import { prepareTravelReportPreview, shareTravelReportPdf, type ReportKind, type
 import { captureAutomaticLocationNow, captureManualLocation, hasBackgroundTrackingPermission, startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 import type { TrackingIntervalHours } from "../types/models";
-import type { RootTabParamList } from "../navigation/AppNavigator";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function DashboardScreen() {
-  const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList, "Dashboard">>();
+  const router = useRouter();
   const { summary, isOffline, selectedDate, settings, refresh, runGeocodeQueue, updateSetting } = useAppStore();
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
   const [pendingQuickMenuAction, setPendingQuickMenuAction] = useState<"share" | ReportKind | null>(null);
@@ -56,6 +63,7 @@ export function DashboardScreen() {
   const topCountries = summary.countryTotals.slice(0, 3);
   const otherDays = Math.max(0, summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0));
   const fiscalYearLabel = formatResidencyYearLabel(settings.residencyYearEnd, settings.calendarYearMode);
+  const dashboardYearButtonLabel = fiscalYearLabel;
   const currentLocation = summary.currentLocation;
   const autoTrackEnabled = isAutoTrackStarting || (hasAlwaysLocationPermission && !settings.trackingPaused && settings.trackingInterval !== "manual");
   const shortcutsAutomationStatus = useMemo(
@@ -283,28 +291,58 @@ export function DashboardScreen() {
           <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
             Dashboard
           </Text>
-          <View className="flex-row shrink-0 items-center gap-2">
-            <HeaderGlassButton
-              accessibilityLabel="Change residency year"
-              active={isYearSelectorOpen}
-              palette={palette}
-              style={styles.yearHeaderButton}
-              onPress={() => setIsYearSelectorOpen(true)}
-            >
-              <Text className="text-lg font-bold" style={{ color: palette.foreground }}>
-                {fiscalYearLabel}
-              </Text>
-            </HeaderGlassButton>
-            <HeaderGlassButton
-              accessibilityLabel="Open dashboard menu"
-              active={isQuickMenuOpen}
-              palette={palette}
-              style={styles.iconHeaderButton}
-              onPress={() => setIsQuickMenuOpen(true)}
-            >
-              <MoreHorizontal size={27} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </HeaderGlassButton>
-          </View>
+          {Platform.OS === "ios" ? (
+            <NativeDashboardHeaderActions
+              accessibilityLabel="Dashboard header actions"
+              color={palette.foreground}
+              fiscalYearLabel={dashboardYearButtonLabel}
+              menuActions={[
+                {
+                  title: "Share Summary",
+                  systemImage: "square.and.arrow.up",
+                  onPress: () => requestAnimationFrame(shareSummary)
+                },
+                {
+                  title: "Monthly Report",
+                  systemImage: "doc.text",
+                  onPress: () => requestAnimationFrame(() => void openReportPreview("monthly"))
+                },
+                {
+                  title: "Calendar Year Report",
+                  systemImage: "calendar",
+                  onPress: () => requestAnimationFrame(() => void openReportPreview("calendar"))
+                },
+                {
+                  title: "Fiscal Year Report",
+                  systemImage: "banknote",
+                  onPress: () => requestAnimationFrame(() => void openReportPreview("fiscal"))
+                }
+              ]}
+              onYearPress={() => setIsYearSelectorOpen(true)}
+            />
+          ) : (
+            <View className="flex-row shrink-0 items-center" style={styles.headerActions}>
+              <HeaderGlassButton
+                accessibilityLabel="Change residency year"
+                active={isYearSelectorOpen}
+                palette={palette}
+                style={styles.yearHeaderButton}
+                onPress={() => setIsYearSelectorOpen(true)}
+              >
+                <BlurReplaceText value={dashboardYearButtonLabel} style={[styles.dashboardYearLabel, { color: palette.foreground }]} />
+              </HeaderGlassButton>
+              <HeaderGlassButton
+                accessibilityLabel="Open dashboard menu"
+                active={isQuickMenuOpen}
+                hitSlop={{ top: 12, right: 18, bottom: 12, left: 12 }}
+                palette={palette}
+                style={styles.iconHeaderButton}
+                onPress={() => setIsQuickMenuOpen(true)}
+              >
+                <MoreHorizontal size={27} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+              </HeaderGlassButton>
+            </View>
+          )}
         </View>
 
         {(summary.pendingValidationCount > 0 || isOffline) && (
@@ -320,31 +358,45 @@ export function DashboardScreen() {
 
         <View style={[styles.autoTrackCard, { backgroundColor: palette.autoTrackCard }]}>
           <View style={styles.autoTrackTopRow}>
-            <View style={styles.autoTrackTitleRow}>
-              <Text className="text-base font-bold" style={[styles.autoTrackTitle, { color: palette.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
-                Auto Track Location
-              </Text>
-              <Info size={18} color={palette.accent} strokeWidth={iconStrokeWidth} />
-            </View>
+            <Text className="text-base font-bold" style={[styles.autoTrackTitle, { color: palette.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
+              Auto Track Location
+            </Text>
             <View style={styles.autoTrackControls}>
-              <Switch
+              <NativeSwitch
                 value={autoTrackEnabled}
                 disabled={isAutoTrackStarting}
+                style={styles.autoTrackSwitch}
                 onValueChange={(value) => void setAutoTrackLocation(value)}
-                trackColor={{ false: palette.switchOff, true: palette.success }}
+                offColor={palette.switchOff}
+                onColor={palette.success}
                 thumbColor={palette.switchThumb}
-                ios_backgroundColor={palette.switchOff}
+                iosBackgroundColor={palette.switchOff}
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Refresh current location"
-                disabled={isRefreshingLocation}
-                hitSlop={8}
-                style={[styles.refreshIconButton, { backgroundColor: palette.pill, borderColor: palette.border, opacity: isRefreshingLocation ? 0.55 : 1 }]}
-                onPress={() => void refreshCurrentLocation()}
-              >
-                <RefreshCw size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-              </Pressable>
+              {Platform.OS === "ios" ? (
+                <NativeGlassButton
+                  accessibilityLabel="Refresh current location"
+                  color={palette.foreground}
+                  disabled={isRefreshingLocation}
+                  fontSize={19}
+                  fontWeight="medium"
+                  shape="circle"
+                  style={styles.refreshNativeGlassButton}
+                  systemImage="arrow.clockwise"
+                  onPress={() => void refreshCurrentLocation()}
+                />
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh current location"
+                  disabled={isRefreshingLocation}
+                  hitSlop={8}
+                  style={[styles.refreshIconButton, { backgroundColor: palette.pill, borderColor: palette.border, opacity: isRefreshingLocation ? 0.55 : 1 }]}
+                  onPress={() => void refreshCurrentLocation()}
+                >
+                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={58} tint={palette.blurTint} tintColor={palette.pill} style={StyleSheet.absoluteFill} />
+                  <RefreshCw size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+                </Pressable>
+              )}
             </View>
           </View>
           <Text className="text-sm" style={[styles.autoTrackCopy, { color: palette.muted }]}>
@@ -363,10 +415,13 @@ export function DashboardScreen() {
             style={[styles.automationButton, { backgroundColor: palette.pill, borderColor: palette.border }]}
             onPress={showAutomationSetup}
           >
-            <Clock3 size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            <Text className="flex-1 text-sm font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
-              Create 1 AM + 1 PM Automations
-            </Text>
+            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={58} tint={palette.blurTint} tintColor={palette.pill} style={StyleSheet.absoluteFill} />
+            <View style={styles.glassButtonContent}>
+              <Clock3 size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+              <Text className="flex-1 text-sm font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
+                Create 1 AM + 1 PM Automations
+              </Text>
+            </View>
           </Pressable>
           <View style={[styles.automationStatusRow, { backgroundColor: palette.pill }]}>
             <View style={[styles.automationStatusDot, { backgroundColor: getShortcutsAutomationStatusColor(shortcutsAutomationStatus.state, palette) }]} />
@@ -384,13 +439,18 @@ export function DashboardScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open year distribution overview"
-          style={styles.yearDistributionPressable}
-          onPress={() => navigation.navigate("YearOverview")}
+          accessibilityHint="Shows the full year overview"
+          hitSlop={6}
+          style={({ pressed }) => [styles.yearDistributionPressable, pressed && styles.yearDistributionPressed]}
+          onPress={() => router.push("/year-overview")}
         >
           <Panel palette={palette}>
-            <Text className="text-lg font-bold" style={{ color: palette.foreground }}>
-              Year Distribution
-            </Text>
+            <View style={styles.yearDistributionHeader}>
+              <Text className="text-lg font-bold" style={{ color: palette.foreground }}>
+                Year Distribution
+              </Text>
+              <ChevronRight size={20} color={palette.section} strokeWidth={iconStrokeWidth} />
+            </View>
             <SegmentedBar
               total={yearDayCount}
               trackColor={palette.track}
@@ -479,6 +539,7 @@ function HeaderGlassButton({
   accessibilityLabel,
   active = false,
   children,
+  hitSlop = 10,
   palette,
   style,
   onPress
@@ -486,6 +547,7 @@ function HeaderGlassButton({
   accessibilityLabel: string;
   active?: boolean;
   children: ReactNode;
+  hitSlop?: number | { top?: number; right?: number; bottom?: number; left?: number };
   palette: Palette;
   style?: StyleProp<ViewStyle>;
   onPress: () => void;
@@ -518,7 +580,7 @@ function HeaderGlassButton({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      hitSlop={10}
+      hitSlop={hitSlop}
       onPress={onPress}
       onPressIn={() => {
         pressProgress.value = withTiming(1, {
@@ -641,11 +703,8 @@ function DashboardQuickMenu({
 }
 
 function GlassBlurLayer({ tint, intensity, style }: { tint: Palette["blurTint"]; intensity: number; style?: StyleProp<ViewStyle> }) {
-  if (Platform.OS === "web") {
-    return <BlurView tint={tint} intensity={intensity} style={style} />;
-  }
-
-  return <View style={[style, { backgroundColor: tint === "dark" ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.08)" }]} />;
+  if (Platform.OS === "web") return <BlurView tint={tint} intensity={intensity} style={style} />;
+  return <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={intensity} tint={tint} style={style} />;
 }
 
 function MenuActionRow({ icon: Icon, label, palette, onPress }: { icon: MenuIcon; label: string; palette: Palette; onPress: () => void }) {
@@ -674,6 +733,10 @@ function ReportPreviewDrawer({
   onClose: () => void;
   onShare: () => void;
 }) {
+  if (Platform.OS === "ios" && isNativeReportPreviewSheetAvailable) {
+    return <NativeReportPreviewSheet isSharing={isSharing} palette={palette} report={report} visible={visible} onClose={onClose} onShare={onShare} />;
+  }
+
   const insets = useSafeAreaInsets();
   const [isRendered, setIsRendered] = useState(visible);
   const [renderedReport, setRenderedReport] = useState<TravelReportPreview | null>(report);
@@ -884,17 +947,9 @@ function ReportPreviewDrawer({
             </View>
           </ScrollView>
 
-          <View className="mx-5 mt-3 flex-row gap-3">
-            <Pressable accessibilityRole="button" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
-              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                Close
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" disabled={isSharing} className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent, opacity: isSharing ? 0.7 : 1 }} onPress={onShare}>
-              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
-                {isSharing ? "Creating PDF" : "Share PDF"}
-              </Text>
-            </Pressable>
+          <View style={styles.drawerActions}>
+            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Close" style={styles.nativeActionButton} onPress={onClose} />
+            <DrawerActionButton disabled={isSharing} backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="square.and.arrow.up" title={isSharing ? "Creating PDF" : "Share PDF"} style={styles.nativeActionButton} onPress={onShare} />
           </View>
         </Animated.View>
       </View>
@@ -915,35 +970,51 @@ function ReportMetric({ label, palette, value }: { label: string; palette: Palet
   );
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const rows: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    rows.push(items.slice(index, index + size));
+  }
+  return rows;
+}
+
 function ReportCalendarDots({ palette, report }: { palette: Palette; report: TravelReportPreview }) {
   const countryColorByCode = useMemo(() => {
     const colors = new Map<string, string>();
     report.stats.countryTotals.forEach((row, index) => colors.set(row.countryCode, getDistributionColor(index, palette)));
     return colors;
   }, [palette, report.stats.countryTotals]);
+  const monthsPerRow = report.calendarMonths.length > 1 ? 4 : 1;
+  const monthRows = useMemo(() => chunkArray(report.calendarMonths, monthsPerRow), [monthsPerRow, report.calendarMonths]);
 
-  const dotSize = report.calendarMonths.length > 1 ? 6 : 8;
-  const dotGap = report.calendarMonths.length > 1 ? 4 : 5;
+  const dotSize = report.calendarMonths.length > 1 ? 5 : 8;
+  const dotGap = report.calendarMonths.length > 1 ? 3 : 5;
   const gridWidth = dotSize * 7 + dotGap * 6;
-  const tileWidth = Math.max(64, gridWidth);
 
   return (
     <View style={styles.reportCalendarGrid}>
-      {report.calendarMonths.map((month) => (
-        <View key={month.key} style={[styles.reportMonthTile, { width: tileWidth }]}>
-          <Text className="text-xs font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted }}>
-            {month.label}
-          </Text>
-          <View style={[styles.reportDotGrid, { gap: dotGap, width: gridWidth }]}>
-            {month.slots.map((slot) => {
-              if (!slot.date) {
-                return <View key={slot.key} style={{ height: dotSize, width: dotSize }} />;
-              }
+      {monthRows.map((row) => (
+        <View key={row.map((month) => month.key).join(":")} style={styles.reportCalendarRow}>
+          {row.map((month) => (
+            <View key={month.key} style={styles.reportMonthTile}>
+              <Text className="text-xs font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted }}>
+                {month.label}
+              </Text>
+              <View style={[styles.reportDotGrid, { gap: dotGap, width: gridWidth }]}>
+                {month.slots.map((slot) => {
+                  if (!slot.date) {
+                    return <View key={slot.key} style={{ height: dotSize, width: dotSize }} />;
+                  }
 
-              const backgroundColor = slot.countryCode ? countryColorByCode.get(slot.countryCode) ?? getDistributionColor(5, palette) : palette.remaining;
-              return <View key={slot.key} style={[styles.reportDot, { backgroundColor, height: dotSize, width: dotSize }]} />;
-            })}
-          </View>
+                  const backgroundColor = slot.countryCode ? countryColorByCode.get(slot.countryCode) ?? getDistributionColor(5, palette) : palette.remaining;
+                  return <View key={slot.key} style={[styles.reportDot, { backgroundColor, height: dotSize, width: dotSize }]} />;
+                })}
+              </View>
+            </View>
+          ))}
+          {Array.from({ length: monthsPerRow - row.length }).map((_, index) => (
+            <View key={`empty-${index}`} style={styles.reportMonthTile} />
+          ))}
         </View>
       ))}
     </View>
@@ -963,6 +1034,18 @@ function AutomationGuideDrawer({
   onOpenShortcuts: () => void;
   onConfirmSetup: () => void;
 }) {
+  if (Platform.OS === "ios" && isNativeAutomationGuideSheetAvailable) {
+    return (
+      <NativeAutomationGuideSheet
+        palette={palette}
+        visible={visible}
+        onClose={onClose}
+        onOpenShortcuts={onOpenShortcuts}
+        onConfirmSetup={onConfirmSetup}
+      />
+    );
+  }
+
   const insets = useSafeAreaInsets();
   const automationTimes = ["1:00 AM", "1:00 PM"];
 
@@ -976,13 +1059,16 @@ function AutomationGuideDrawer({
           style={[
             styles.automationDrawer,
             {
-              backgroundColor: palette.menuGlassFill,
               borderColor: palette.glassBorder,
               paddingBottom: Math.max(insets.bottom, 14) + 10,
               shadowColor: palette.glassShadow
             }
           ]}
         >
+          <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={76} tint={palette.blurTint} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
+          <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
+          <View style={[styles.yearDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
           <View style={[styles.drawerHandle, { backgroundColor: palette.glassBorderActive }]} />
           <View className="flex-row items-center gap-3 px-5 pt-5">
             <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: palette.pill }}>
@@ -1013,23 +1099,11 @@ function AutomationGuideDrawer({
             <StepLine value="Set Run Immediately, then tap Done." palette={palette} />
           </View>
 
-          <Pressable accessibilityRole="button" accessibilityLabel="Confirm both Log Country automations were created" className="mx-5 mt-5 h-12 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={onConfirmSetup}>
-            <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
-              I created both automations
-            </Text>
-          </Pressable>
+          <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="I created both automations" style={styles.nativeFullButton} onPress={onConfirmSetup} />
 
-          <View className="mx-5 mt-3 flex-row gap-3">
-            <Pressable accessibilityRole="button" accessibilityLabel="Close automation setup steps" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
-              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                Close
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Open Shortcuts automation setup" className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={onOpenShortcuts}>
-              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
-                Open Shortcuts
-              </Text>
-            </Pressable>
+          <View style={styles.drawerActions}>
+            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Close" style={styles.nativeActionButton} onPress={onClose} />
+            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="arrow.up.forward.app" title="Open Shortcuts" style={styles.nativeActionButton} onPress={onOpenShortcuts} />
           </View>
         </View>
       </View>
@@ -1088,6 +1162,10 @@ function YearSelectorDrawer({
   onClose: () => void;
   onConfirm: (year: number, calendarYearMode: boolean) => void;
 }) {
+  if (Platform.OS === "ios" && isNativeResidencyYearSheetAvailable) {
+    return <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />;
+  }
+
   const insets = useSafeAreaInsets();
   const [isRendered, setIsRendered] = useState(visible);
   const [draftYear, setDraftYear] = useState(year);
@@ -1231,17 +1309,9 @@ function YearSelectorDrawer({
             <YearModeButton selected={draftCalendarYearMode} title="Calendar" detail="Jan-Dec" palette={palette} onPress={() => setDraftCalendarYearMode(true)} />
           </View>
 
-          <View className="mx-5 mt-5 flex-row gap-3">
-            <Pressable accessibilityRole="button" accessibilityLabel="Cancel residency year selection" className="h-12 flex-1 items-center justify-center rounded-2xl border active:opacity-75" style={{ borderColor: palette.border, backgroundColor: palette.pill }} onPress={onClose}>
-              <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Confirm residency year selection" className="h-12 flex-1 items-center justify-center rounded-2xl active:opacity-75" style={{ backgroundColor: palette.accent }} onPress={confirmSelection}>
-              <Text className="text-sm font-bold" style={{ color: palette.accentForeground }}>
-                Confirm
-              </Text>
-            </Pressable>
+          <View style={[styles.drawerActions, styles.drawerActionsLarge]}>
+            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={confirmSelection} />
           </View>
         </Animated.View>
       </View>
@@ -1511,6 +1581,18 @@ const styles = StyleSheet.create({
   yearDistributionPressable: {
     borderRadius: 28
   },
+  yearDistributionPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.985 }]
+  },
+  yearDistributionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  headerActions: {
+    columnGap: 12
+  },
   headerGlassButton: {
     alignItems: "center",
     borderCurve: "continuous",
@@ -1525,7 +1607,12 @@ const styles = StyleSheet.create({
   yearHeaderButton: {
     height: 44,
     paddingHorizontal: 16,
-    minWidth: 104
+    minWidth: 132
+  },
+  dashboardYearLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    fontWeight: "700"
   },
   iconHeaderButton: {
     height: 44,
@@ -1584,19 +1671,19 @@ const styles = StyleSheet.create({
   autoTrackTopRow: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  autoTrackTitleRow: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: 14,
-    paddingRight: 12
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 52
   },
   autoTrackControls: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 8
+  },
+  autoTrackSwitch: {
+    alignSelf: "center",
+    transform: [{ translateY: 2 }]
   },
   refreshIconButton: {
     alignItems: "center",
@@ -1604,7 +1691,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
+    overflow: "hidden",
     width: 38
+  },
+  refreshNativeGlassButton: {
+    height: 44,
+    width: 44
   },
   automationButton: {
     alignItems: "center",
@@ -1615,7 +1707,16 @@ const styles = StyleSheet.create({
     height: 42,
     justifyContent: "center",
     marginTop: 2,
+    overflow: "hidden",
     paddingHorizontal: 14
+  },
+  glassButtonContent: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minWidth: 0,
+    zIndex: 1
   },
   automationStatusRow: {
     alignItems: "center",
@@ -1631,6 +1732,7 @@ const styles = StyleSheet.create({
     width: 9
   },
   autoTrackTitle: {
+    flex: 1,
     flexShrink: 1,
     fontFamily: "Inter_700Bold",
     fontSize: 16,
@@ -1719,6 +1821,29 @@ const styles = StyleSheet.create({
   reportPreviewScroll: {
     flexShrink: 1
   },
+  drawerActions: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    gap: 20,
+    marginHorizontal: 20,
+    marginTop: 16
+  },
+  drawerActionsLarge: {
+    marginTop: 24
+  },
+  nativeActionButton: {
+    flex: 1,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    width: 0
+  },
+  nativeFullButton: {
+    alignSelf: "stretch",
+    marginHorizontal: 20,
+    marginTop: 20
+  },
   reportMetricGrid: {
     flexDirection: "row",
     gap: 8
@@ -1729,12 +1854,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14
   },
   reportCalendarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 14,
     marginTop: 14
   },
+  reportCalendarRow: {
+    flexDirection: "row",
+    gap: 8
+  },
   reportMonthTile: {
+    alignItems: "center",
+    flex: 1,
     gap: 8
   },
   reportDotGrid: {

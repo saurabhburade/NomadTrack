@@ -9,6 +9,7 @@ let dbWriteQueue: Promise<void> = Promise.resolve();
 const currentYear = new Date().getUTCFullYear();
 const maxManualEntryDays = 3660;
 const manualTripNotes = ["Manual history entry", "Manual day correction"];
+const sqliteBusyRetryDelaysMs = [80, 160, 320, 640, 1000];
 
 export const defaultSettings: AppSettings = {
   trackingInterval: 4,
@@ -37,8 +38,10 @@ export async function getDb() {
 export async function runDbWriteTransaction(task: (transactionDb: SQLite.SQLiteDatabase) => Promise<void>) {
   const run = async () => {
     const db = await getDb();
-    await db.withExclusiveTransactionAsync(async (transactionDb) => {
-      await task(transactionDb as unknown as SQLite.SQLiteDatabase);
+    await withSqliteBusyRetry(async () => {
+      await db.withExclusiveTransactionAsync(async (transactionDb) => {
+        await task(transactionDb as unknown as SQLite.SQLiteDatabase);
+      });
     });
   };
 
@@ -49,10 +52,32 @@ export async function runDbWriteTransaction(task: (transactionDb: SQLite.SQLiteD
 
 async function openConfiguredDatabase() {
   const db = await SQLite.openDatabaseAsync("travel-nri-tracker.db");
+  await db.execAsync("PRAGMA busy_timeout = 5000;");
   await db.execAsync("PRAGMA foreign_keys = ON;");
   await db.execAsync("PRAGMA journal_mode = WAL;");
   await migrate(db);
   return db;
+}
+
+async function withSqliteBusyRetry<T>(task: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      const delayMs = sqliteBusyRetryDelaysMs[attempt];
+      if (delayMs === undefined || !isSqliteBusyError(error)) throw error;
+      await sleep(delayMs);
+    }
+  }
+}
+
+function isSqliteBusyError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("database is locked") || message.includes("SQLITE_BUSY") || message.includes("Error code 5");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function migrate(db: SQLite.SQLiteDatabase) {
@@ -80,13 +105,14 @@ export async function readSettings(): Promise<AppSettings> {
 }
 
 export async function writeSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
-  const db = await getDb();
-  await db.runAsync(
-    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
-    String(key),
-    JSON.stringify(value),
-    new Date().toISOString()
-  );
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
+      String(key),
+      JSON.stringify(value),
+      new Date().toISOString()
+    );
+  });
 }
 
 export async function hasLocalTravelData() {
@@ -148,20 +174,21 @@ export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt"
 }
 
 export async function enqueueGeocodeJob(point: Pick<LocationPoint, "id" | "latitude" | "longitude" | "timestamp">) {
-  const db = await getDb();
   const now = new Date().toISOString();
-  await db.runAsync(
-    `INSERT OR IGNORE INTO pending_geocode_jobs (
-      id, location_point_id, latitude, longitude, timestamp, status, retry_count, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
-    uuid("geo"),
-    point.id,
-    point.latitude,
-    point.longitude,
-    point.timestamp,
-    now,
-    now
-  );
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO pending_geocode_jobs (
+        id, location_point_id, latitude, longitude, timestamp, status, retry_count, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+      uuid("geo"),
+      point.id,
+      point.latitude,
+      point.longitude,
+      point.timestamp,
+      now,
+      now
+    );
+  });
 }
 
 export async function getPendingGeocodeJobs(limit = 25) {
@@ -176,36 +203,39 @@ export async function getPendingGeocodeJobs(limit = 25) {
 }
 
 export async function updateGeocodeJob(id: string, status: string, retryCount: number, error?: string) {
-  const db = await getDb();
-  await db.runAsync(
-    "UPDATE pending_geocode_jobs SET status = ?, retry_count = ?, last_attempt_at = ?, error = ?, updated_at = ? WHERE id = ?",
-    status,
-    retryCount,
-    new Date().toISOString(),
-    error ?? null,
-    new Date().toISOString(),
-    id
-  );
+  const now = new Date().toISOString();
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      "UPDATE pending_geocode_jobs SET status = ?, retry_count = ?, last_attempt_at = ?, error = ?, updated_at = ? WHERE id = ?",
+      status,
+      retryCount,
+      now,
+      error ?? null,
+      now,
+      id
+    );
+  });
 }
 
 export async function updateLocationGeocode(
   id: string,
   result: Pick<LocationPoint, "countryCode" | "countryName" | "region" | "city" | "timezone">
 ) {
-  const db = await getDb();
-  await db.runAsync(
-    `UPDATE location_points SET
-      country_code = ?, country_name = ?, region = ?, city = ?, timezone = COALESCE(?, timezone),
-      reverse_geocode_status = 'done', updated_at = ?
-     WHERE id = ?`,
-    result.countryCode ?? null,
-    result.countryName ?? null,
-    result.region ?? null,
-    result.city ?? null,
-    result.timezone ?? null,
-    new Date().toISOString(),
-    id
-  );
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      `UPDATE location_points SET
+        country_code = ?, country_name = ?, region = ?, city = ?, timezone = COALESCE(?, timezone),
+        reverse_geocode_status = 'done', updated_at = ?
+       WHERE id = ?`,
+      result.countryCode ?? null,
+      result.countryName ?? null,
+      result.region ?? null,
+      result.city ?? null,
+      result.timezone ?? null,
+      new Date().toISOString(),
+      id
+    );
+  });
 }
 
 export async function readDashboardSummary(): Promise<DashboardSummary> {
@@ -443,6 +473,24 @@ export async function updateManualDayEntry(entry: {
       now,
       now
     );
+  });
+}
+
+export async function deleteDayEntry(date: string) {
+  const now = new Date().toISOString();
+
+  await runDbWriteTransaction(async (db) => {
+    await removeManualTripsForDate(db, date, now);
+    await db.runAsync(
+      `DELETE FROM pending_geocode_jobs
+       WHERE timestamp >= ?
+         AND timestamp <= ?`,
+      `${date}T00:00:00.000Z`,
+      `${date}T23:59:59.999Z`
+    );
+    await db.runAsync("DELETE FROM location_points WHERE timestamp >= ? AND timestamp <= ?", `${date}T00:00:00.000Z`, `${date}T23:59:59.999Z`);
+    await db.runAsync("DELETE FROM day_country_segments WHERE date = ?", date);
+    await db.runAsync("DELETE FROM day_records WHERE date = ?", date);
   });
 }
 

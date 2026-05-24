@@ -275,6 +275,17 @@ export async function updateManualDayEntry(entry: {
   globalThis.localStorage?.setItem(DAY_RECORDS_KEY, JSON.stringify(records));
 }
 
+export async function deleteDayEntry(date: string) {
+  const trips = removeManualTripsForDate(readStoredTrips(), date);
+  globalThis.localStorage?.setItem(TRIPS_KEY, JSON.stringify(trips));
+
+  const points = readStoredPoints().filter((point) => point.timestamp.slice(0, 10) !== date);
+  globalThis.localStorage?.setItem(POINTS_KEY, JSON.stringify(points));
+
+  const records = readStoredDayRecords().filter((record) => record.date !== date);
+  globalThis.localStorage?.setItem(DAY_RECORDS_KEY, JSON.stringify(records));
+}
+
 export async function readDayRecordsForMonth(monthStartIso: string) {
   const start = monthStartIso.slice(0, 8) + "01";
   const end = new Date(`${start}T00:00:00.000Z`);

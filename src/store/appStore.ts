@@ -2,6 +2,7 @@ import * as Network from "expo-network";
 import { create } from "zustand";
 import {
   defaultSettings,
+  deleteDayEntry as deleteStoredDayEntry,
   insertManualTravelEntry,
   readDashboardSummary,
   readDayRecordsForDashboardYear,
@@ -41,12 +42,14 @@ type AppState = {
   setSelectedDate: (date: string) => Promise<void>;
   addManualEntry: (entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) => Promise<void>;
   updateDayEntry: (entry: { originalDate: string; date: string; countryCode: string; countryName: string }) => Promise<void>;
+  deleteDayEntry: (date: string) => Promise<void>;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
   runGeocodeQueue: () => Promise<void>;
 };
 
 const today = new Date().toISOString().slice(0, 10);
 const STARTUP_TIMEOUT_MS = 5000;
+let dataLoadSequence = 0;
 
 async function withTimeout<T>(label: string, promise: Promise<T>, timeoutMs = STARTUP_TIMEOUT_MS): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -111,6 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   refresh: async () => {
+    const loadSequence = ++dataLoadSequence;
     const [settings, summary, mapPoints, trips, monthRecords, yearRecords] = await Promise.all([
       readSettings(),
       readDashboardSummary(),
@@ -120,6 +124,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       readDayRecordsForDashboardYear()
     ]);
     const isOffline = await readNetworkOfflineState();
+    if (loadSequence !== dataLoadSequence) return;
+
     set({
       settings,
       summary,
@@ -134,8 +140,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
   setSelectedDate: async (date) => {
+    const loadSequence = ++dataLoadSequence;
     set({ selectedDate: date });
     const [mapPoints, monthRecords] = await Promise.all([readLocationPointsForDashboardYear(), readDayRecordsForMonth(date)]);
+    if (loadSequence !== dataLoadSequence) return;
+
     set({ mapPoints, monthRecords: monthRecords as DayRecordPreview[] });
   },
   addManualEntry: async (entry) => {
@@ -146,6 +155,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateDayEntry: async (entry) => {
     await updateManualDayEntry(entry);
     set({ selectedDate: entry.date });
+    await get().refresh();
+  },
+  deleteDayEntry: async (date) => {
+    await deleteStoredDayEntry(date);
+    set({ selectedDate: date });
     await get().refresh();
   },
   updateSetting: async (key, value) => {

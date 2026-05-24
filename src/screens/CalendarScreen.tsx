@@ -1,18 +1,39 @@
-import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, isAfter, isSameMonth, parseISO, startOfMonth, subMonths } from "date-fns";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Globe2, Images, PencilLine, Plus } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
+import { addDays, addMonths, endOfMonth, format, isAfter, isSameMonth, parseISO, startOfMonth, subMonths } from "date-fns";
+import { CalendarDays, ChevronLeft, ChevronRight, Globe2, PencilLine, Plus, Trash2 } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, useWindowDimensions, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from "react-native";
+import { CalendarList, type CalendarListProps, type DateData } from "react-native-calendars";
 import { BlurView } from "expo-blur";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NativeCalendarMonthGrid, isNativeCalendarMonthGridAvailable } from "../components/native/NativeCalendarMonthGrid";
+import { NativeCalendarToolbar, isNativeCalendarToolbarAvailable } from "../components/native/NativeCalendarToolbar";
+import { NativeEditDaySheet, isNativeEditDaySheetAvailable } from "../components/native/NativeEditDaySheet";
+import { NativeManualEntrySheet, isNativeManualEntrySheetAvailable } from "../components/native/NativeManualEntrySheet";
+import { NativeMonthYearSheet, isNativeMonthYearSheetAvailable } from "../components/native/NativeMonthYearSheet";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
+import { DrawerActionButton } from "../components/ui/drawer-action-button";
+import { BlurReplaceText } from "../components/ui/blur-replace-text";
 import { Text } from "../components/ui/text";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
-import { useAppStore } from "../store/appStore";
+import { useAppStore, type DayRecordPreview } from "../store/appStore";
 
 const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const CALENDAR_MIN_YEAR = 1900;
+const CALENDAR_MAX_YEAR = 2100;
+const CALENDAR_DAY_TAP_SLOP = 14;
+const CALENDAR_DAY_TAP_MAX_DURATION_MS = 700;
+const MANUAL_ENTRY_MIN_DATE = "1900-01-01";
+const MANUAL_ENTRY_MAX_DATE = "2100-12-31";
 type CountryOption = { code: string; name: string };
+type CalendarDayTouchStart = {
+  iso: string;
+  pageX: number;
+  pageY: number;
+  startedAt: number;
+};
 
 const priorityCountryCodes = ["IN", "US", "GB", "AE", "SG", "CA", "AU", "DE", "FR", "JP", "TH", "MY", "ID", "LK", "NP", "BD"] as const;
 const isoCountryCodes = [
@@ -286,21 +307,14 @@ type DayLocationEntry = {
   countryName: string;
 };
 
-type CalendarCell = {
-  date: Date;
-  iso: string;
-  isBlank: false;
-} | {
-  key: string;
-  isBlank: true;
-};
-
 export function CalendarScreen() {
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
-  const { monthRecords, selectedDate, setSelectedDate, settings, addManualEntry, updateDayEntry } = useAppStore();
+  const { width: windowWidth } = useWindowDimensions();
+  const { monthRecords, yearRecords, selectedDate, setSelectedDate, settings, addManualEntry, updateDayEntry, deleteDayEntry } = useAppStore();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getPalette(isDark);
+  const calendarWidth = Math.max(280, windowWidth - 36);
   const [month, setMonth] = useState(() => startOfMonth(parseISO(selectedDate)));
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
@@ -310,35 +324,164 @@ export function CalendarScreen() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const selectedDateInMonth = isSameMonth(parseISO(selectedDate), month) ? selectedDate : todayIso;
   const recordsByDate = useMemo(() => new Map(monthRecords.map((record) => [record.date, record])), [monthRecords]);
-  const cells = useMemo(() => buildCalendarCells(month), [month]);
+  const yearRecordsByDate = useMemo(() => new Map(yearRecords.map((record) => [record.date, record])), [yearRecords]);
+  const nativeManualEntryRecords = useMemo(
+    () =>
+      yearRecords
+        .filter((record) => record.primary_country_code)
+        .map((record) => ({
+          date: record.date,
+          countryCode: record.primary_country_code!
+        })),
+    [yearRecords]
+  );
+  const nativeCalendarDayRecords = useMemo(
+    () =>
+      monthRecords.map((record) => ({
+        date: record.date,
+        countryCode: record.primary_country_code ?? ""
+      })),
+    [monthRecords]
+  );
   const monthSummary = useMemo(() => buildMonthSummary(monthRecords, month), [monthRecords, month]);
   const editingRecord = editingDate ? recordsByDate.get(editingDate) : undefined;
+  const calendarScrollRange = useMemo(() => getCalendarScrollRange(month), [month]);
+  const calendarMonthKey = useMemo(() => format(month, "yyyy-MM"), [month]);
+  const calendarRenderKey = useMemo(() => `${calendarMonthKey}:${selectedDate}:${monthRecords.map((record) => `${record.date}:${record.primary_country_code ?? ""}`).join(",")}`, [calendarMonthKey, monthRecords, selectedDate]);
+  const programmaticMonthIsoRef = useRef<string | null>(null);
+  const calendarDayTouchStartRef = useRef<CalendarDayTouchStart | null>(null);
+  const lastDayOpenRef = useRef<{ iso: string; openedAt: number } | null>(null);
 
-  async function selectDay(iso: string) {
-    await setSelectedDate(iso);
+  const setVisibleMonth = useCallback((nextMonth: Date) => {
+    const start = startOfMonth(nextMonth);
+    const startIso = format(start, "yyyy-MM-dd");
+    setMonth((currentMonth) => (format(currentMonth, "yyyy-MM-dd") === startIso ? currentMonth : start));
+    return startIso;
+  }, []);
+
+  const markProgrammaticMonth = useCallback((monthIso: string) => {
+    programmaticMonthIsoRef.current = monthIso;
+  }, []);
+
+  const selectDay = useCallback((iso: string) => {
+    const now = Date.now();
+    const lastOpen = lastDayOpenRef.current;
+    if (lastOpen?.iso === iso && now - lastOpen.openedAt < 250) return;
+
+    lastDayOpenRef.current = { iso, openedAt: now };
     setEditingDate(iso);
-  }
+    void setSelectedDate(iso).catch((error) => {
+      console.warn("[calendar] Failed to select day", error);
+    });
+  }, [setSelectedDate]);
 
-  async function shiftMonth(direction: -1 | 1) {
+  const handleDayTouchStart = useCallback((iso: string, event: GestureResponderEvent) => {
+    calendarDayTouchStartRef.current = {
+      iso,
+      pageX: event.nativeEvent.pageX,
+      pageY: event.nativeEvent.pageY,
+      startedAt: Date.now()
+    };
+  }, []);
+
+  const handleDayTouchEnd = useCallback(
+    (iso: string, event: GestureResponderEvent) => {
+      const touchStart = calendarDayTouchStartRef.current;
+      calendarDayTouchStartRef.current = null;
+      if (!touchStart || touchStart.iso !== iso) return;
+
+      const deltaX = Math.abs(event.nativeEvent.pageX - touchStart.pageX);
+      const deltaY = Math.abs(event.nativeEvent.pageY - touchStart.pageY);
+      const duration = Date.now() - touchStart.startedAt;
+      if (deltaX <= CALENDAR_DAY_TAP_SLOP && deltaY <= CALENDAR_DAY_TAP_SLOP && duration <= CALENDAR_DAY_TAP_MAX_DURATION_MS) {
+        selectDay(iso);
+      }
+    },
+    [selectDay]
+  );
+
+  const shiftMonth = useCallback(async (direction: -1 | 1) => {
     const nextMonth = direction === 1 ? addMonths(month, 1) : subMonths(month, 1);
-    const nextIso = format(nextMonth, "yyyy-MM-dd");
-    setMonth(nextMonth);
+    const nextIso = setVisibleMonth(nextMonth);
+    markProgrammaticMonth(nextIso);
+    await setSelectedDate(nextIso);
+  }, [markProgrammaticMonth, month, setSelectedDate, setVisibleMonth]);
+
+  async function changeMonth(nextMonth: Date) {
+    const nextIso = setVisibleMonth(nextMonth);
+    markProgrammaticMonth(nextIso);
     await setSelectedDate(nextIso);
   }
 
-  async function changeMonth(nextMonth: Date) {
-    const start = startOfMonth(nextMonth);
-    setMonth(start);
-    await setSelectedDate(format(start, "yyyy-MM-dd"));
-  }
+  const handleVisibleMonthsChange = useCallback(
+    (visibleMonths: DateData[]) => {
+      const visibleMonth = visibleMonths[0];
+      if (!visibleMonth?.dateString) return;
+
+      const nextMonth = startOfMonth(parseISO(visibleMonth.dateString));
+      const nextIso = format(nextMonth, "yyyy-MM-dd");
+      if (programmaticMonthIsoRef.current) {
+        const programmaticMonthIso = programmaticMonthIsoRef.current;
+        programmaticMonthIsoRef.current = null;
+        if (programmaticMonthIso === nextIso) return;
+      }
+      if (nextIso === format(month, "yyyy-MM-dd")) return;
+
+      setVisibleMonth(nextMonth);
+      void setSelectedDate(nextIso);
+    },
+    [month, setSelectedDate, setVisibleMonth]
+  );
+
+  const renderCalendarDay = useCallback(
+    ({ date, state }: { date?: DateData; state?: string }) => {
+      if (!date) return <View style={styles.dayCell} />;
+
+      const iso = date.dateString;
+      const dayDate = parseISO(iso);
+      const isVisibleMonthDay = isSameMonth(dayDate, month);
+      const record = recordsByDate.get(iso);
+      const isSelected = iso === selectedDateInMonth;
+      const isFuture = isAfter(dayDate, parseISO(todayIso));
+      const countryCode = isVisibleMonthDay ? record?.primary_country_code ?? null : null;
+
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${format(dayDate, "MMMM d")}${countryCode ? `, ${countryCode}` : ""}`}
+          hitSlop={6}
+          pressRetentionOffset={12}
+          style={styles.dayCell}
+          onPress={() => selectDay(iso)}
+          onTouchCancel={() => {
+            calendarDayTouchStartRef.current = null;
+          }}
+          onTouchEnd={(event) => handleDayTouchEnd(iso, event)}
+          onTouchStart={(event) => handleDayTouchStart(iso, event)}
+        >
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.dayNumber,
+              {
+                color: isSelected ? palette.accent : palette.foreground,
+                opacity: state === "disabled" || (isFuture && !countryCode) ? 0.56 : 1
+              }
+            ]}
+          >
+            {date.day}
+          </Text>
+          <Text numberOfLines={1} style={styles.flagText}>
+            {countryCode ? flagForCountry(countryCode) : ""}
+          </Text>
+        </Pressable>
+      );
+    },
+    [month, palette.accent, palette.foreground, recordsByDate, selectDay, selectedDateInMonth, todayIso]
+  );
 
   function openManualEntry() {
     setOpenManualEntryAfterMenuClose(true);
-    setIsAddMenuOpen(false);
-  }
-
-  function openPhotoScanner() {
-    setOpenManualEntryAfterMenuClose(false);
     setIsAddMenuOpen(false);
   }
 
@@ -355,12 +498,17 @@ export function CalendarScreen() {
 
   async function insertManualEntry(entry: ManualTravelEntry) {
     await addManualEntry(entry);
-    setMonth(startOfMonth(parseISO(entry.startDate)));
+    setVisibleMonth(parseISO(entry.startDate));
   }
 
   async function updateDay(entry: DayLocationEntry) {
     await updateDayEntry(entry);
-    setMonth(startOfMonth(parseISO(entry.date)));
+    setVisibleMonth(parseISO(entry.date));
+  }
+
+  async function deleteDay(date: string) {
+    await deleteDayEntry(date);
+    setVisibleMonth(parseISO(date));
   }
 
   return (
@@ -380,100 +528,117 @@ export function CalendarScreen() {
         showsHorizontalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <View style={styles.topActionRow}>
-            <Text className="text-3xl font-extrabold" style={[styles.title, { color: palette.foreground }]}>
-              History
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Add travel entry"
-              accessibilityState={isAddMenuOpen ? { expanded: true } : undefined}
-              style={[styles.addButton, { backgroundColor: palette.addButton, borderColor: palette.addBorder, shadowColor: palette.addShadow }]}
-              onPress={() => setIsAddMenuOpen(true)}
-            >
-              <Plus size={24} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-          </View>
+          {isNativeCalendarToolbarAvailable ? (
+            <NativeCalendarToolbar
+              foregroundColor={palette.foreground}
+              label={format(month, "MMMM yyyy")}
+              style={styles.nativeCalendarToolbar}
+              onManualEntry={() => {
+                setOpenManualEntryAfterMenuClose(false);
+                setIsManualEntryOpen(true);
+              }}
+              onMonthPress={() => setIsMonthPickerOpen(true)}
+              onNextMonth={() => void shiftMonth(1)}
+              onPreviousMonth={() => void shiftMonth(-1)}
+            />
+          ) : (
+            <>
+              <View style={styles.topActionRow}>
+                <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={[styles.title, { color: palette.foreground }]}>
+                  History
+                </Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Add travel entry" style={({ pressed }) => [styles.addButton, { shadowColor: palette.addShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => setIsAddMenuOpen(true)}>
+                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                  <Plus size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+                </Pressable>
+              </View>
 
-        <View style={styles.monthRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Change month and year"
-            hitSlop={8}
-            style={styles.monthLabel}
-            onPress={() => setIsMonthPickerOpen(true)}
-          >
-            <Text className="text-lg font-bold" style={[styles.monthText, { color: palette.foreground }]}>
-              {format(month, "MMMM yyyy")}
-            </Text>
-            <ChevronRight size={22} color={palette.accent} strokeWidth={iconStrokeWidth} />
-          </Pressable>
-          <View style={styles.monthControls}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={12} style={styles.monthButton} onPress={() => void shiftMonth(-1)}>
-              <ChevronLeft size={31} color={palette.accent} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next month" hitSlop={12} style={styles.monthButton} onPress={() => void shiftMonth(1)}>
-              <ChevronRight size={31} color={palette.accent} strokeWidth={iconStrokeWidth} />
-            </Pressable>
-          </View>
-        </View>
+              <View style={styles.monthRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Previous month" style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => void shiftMonth(-1)}>
+                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                  <ChevronLeft size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+                </Pressable>
+                <MonthHeaderButton label={format(month, "MMMM yyyy")} palette={palette} style={styles.monthCenterLabel} onPress={() => setIsMonthPickerOpen(true)} />
+                <Pressable accessibilityRole="button" accessibilityLabel="Next month" style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => void shiftMonth(1)}>
+                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                  <ChevronRight size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+                </Pressable>
+              </View>
+            </>
+          )}
 
         <MonthSummaryPanel palette={palette} summary={monthSummary} />
 
-        <View style={styles.weekdayRow}>
-          {weekdays.map((day) => (
-            <Text key={day} className="text-xs font-bold" style={[styles.weekdayText, { color: palette.weekday }]}>
-              {day}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.calendarGrid}>
-          {chunk(cells, 7).map((week, weekIndex) => (
-            <View key={`week-${weekIndex}`} style={styles.weekRow}>
-              {week.map((cell) => {
-                if (cell.isBlank) {
-                  return <View key={cell.key} style={styles.dayCell} />;
-                }
-
-                const record = recordsByDate.get(cell.iso);
-                const isSelected = cell.iso === selectedDateInMonth;
-                const isFuture = isAfter(cell.date, parseISO(todayIso));
-                const countryCode = record?.primary_country_code ?? null;
-
-                return (
-                  <Pressable
-                    key={cell.iso}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${format(cell.date, "MMMM d")}${countryCode ? `, ${countryCode}` : ""}`}
-                    style={styles.dayCell}
-                    onPress={() => void selectDay(cell.iso)}
-                  >
-                    <Text
-                      className="text-lg"
-                      style={[
-                        styles.dayNumber,
-                        {
-                          color: isSelected ? palette.accent : isFuture ? palette.foreground : palette.foreground,
-                          opacity: isFuture && !countryCode ? 0.96 : 1
-                        }
-                      ]}
-                    >
-                      {format(cell.date, "d")}
-                    </Text>
-                    {countryCode ? (
-                      <Text className="text-lg" style={styles.flagText}>
-                        {flagForCountry(countryCode)}
-                      </Text>
-                    ) : (
-                      <View style={styles.flagPlaceholder} />
-                    )}
-                  </Pressable>
-                );
-              })}
+        {isNativeCalendarMonthGridAvailable ? (
+          <NativeCalendarMonthGrid
+            dayRecords={nativeCalendarDayRecords}
+            monthDate={format(month, "yyyy-MM-dd")}
+            palette={{
+              accent: palette.accent,
+              foreground: palette.foreground,
+              weekday: palette.weekdayHeader
+            }}
+            selectedDate={selectedDateInMonth}
+            style={[styles.nativeCalendarMonthGrid, { width: calendarWidth }]}
+            onDayPress={selectDay}
+          />
+        ) : (
+          <>
+            <View style={[styles.weekdayRow, { width: calendarWidth }]}>
+              {weekdays.map((weekday) => (
+                <Text key={weekday} numberOfLines={1} style={[styles.weekdayLabel, { color: palette.weekdayHeader }]}>
+                  {weekday.slice(0, 3)}
+                </Text>
+              ))}
             </View>
-          ))}
-        </View>
+
+            <CalendarList
+              animateScroll
+              calendarHeight={390}
+              calendarStyle={styles.calendarPage}
+              calendarWidth={calendarWidth}
+              current={format(month, "yyyy-MM-dd")}
+              dayComponent={renderCalendarDay}
+              extraData={calendarRenderKey}
+              firstDay={0}
+              futureScrollRange={calendarScrollRange.futureScrollRange}
+              hideArrows
+              hideDayNames
+              hideExtraDays
+              horizontal
+              initialDate={format(month, "yyyy-MM-dd")}
+              key={calendarMonthKey}
+              keyboardShouldPersistTaps="handled"
+              pagingEnabled
+              pastScrollRange={calendarScrollRange.pastScrollRange}
+              removeClippedSubviews={false}
+              renderHeader={() => null}
+              showScrollIndicator={false}
+              style={styles.calendarGrid}
+              theme={{
+                calendarBackground: "transparent",
+                textSectionTitleColor: palette.weekdayHeader,
+                textDayHeaderFontFamily: "Inter_700Bold",
+                textDayHeaderFontSize: 12,
+                weekVerticalMargin: 0,
+                "stylesheet.calendar.header": {
+                  header: styles.calendarLibraryHiddenHeader,
+                  dayHeader: styles.calendarLibraryDayHeader,
+                  week: styles.calendarLibraryWeekHeader
+                },
+                "stylesheet.calendar.main": {
+                  container: styles.calendarLibraryContainer,
+                  dayContainer: styles.calendarLibraryDayContainer,
+                  emptyDayContainer: styles.calendarLibraryEmptyDayContainer,
+                  monthView: styles.calendarLibraryMonthView,
+                  week: styles.calendarLibraryWeek
+                }
+              } as CalendarListProps["theme"]}
+              onDayPress={(date) => selectDay(date.dateString)}
+              onVisibleMonthsChange={handleVisibleMonthsChange}
+            />
+          </>
+        )}
 
         <View style={styles.spacer} />
         </View>
@@ -485,39 +650,139 @@ export function CalendarScreen() {
         onClose={handleAddMenuClose}
         onClosed={handleAddMenuClosed}
         onManualEntry={openManualEntry}
-        onPhotoScanner={openPhotoScanner}
       />
-      <MonthYearPicker
-        month={month}
-        palette={palette}
-        visible={isMonthPickerOpen}
-        onClose={() => setIsMonthPickerOpen(false)}
-        onConfirm={(nextMonth) => {
-          setIsMonthPickerOpen(false);
-          void changeMonth(nextMonth);
-        }}
-      />
-      <ManualEntryDrawer
-        initialDate={selectedDateInMonth}
-        palette={palette}
-        visible={isManualEntryOpen}
-        onClose={() => setIsManualEntryOpen(false)}
-        onConfirm={async (entry) => {
-          await insertManualEntry(entry);
-          setIsManualEntryOpen(false);
-        }}
-      />
-      <DayEditDrawer
-        initialCountryInput={editingRecord?.primary_country_name ?? editingRecord?.primary_country_code ?? ""}
-        initialDate={editingDate ?? selectedDateInMonth}
-        palette={palette}
-        visible={Boolean(editingDate)}
-        onClose={() => setEditingDate(null)}
-        onConfirm={async (entry) => {
-          await updateDay(entry);
-          setEditingDate(null);
-        }}
-      />
+      {isNativeMonthYearSheetAvailable ? (
+        <NativeMonthYearSheet
+          monthIndex={month.getMonth()}
+          palette={{
+            foreground: palette.foreground,
+            muted: palette.muted,
+            pill: palette.inputFill,
+            accent: palette.foreground,
+            accentForeground: palette.actionPrimaryForeground,
+            border: palette.inputBorder,
+            menuGlassFill: palette.menuGlassFill
+          }}
+          visible={isMonthPickerOpen}
+          year={month.getFullYear()}
+          onClose={() => setIsMonthPickerOpen(false)}
+          onConfirm={(monthIndex, year) => {
+            setIsMonthPickerOpen(false);
+            void changeMonth(new Date(year, monthIndex, 1));
+          }}
+        />
+      ) : (
+        <MonthYearPicker
+          month={month}
+          palette={palette}
+          visible={isMonthPickerOpen}
+          onClose={() => setIsMonthPickerOpen(false)}
+          onConfirm={(nextMonth) => {
+            setIsMonthPickerOpen(false);
+            void changeMonth(nextMonth);
+          }}
+        />
+      )}
+      {isNativeManualEntrySheetAvailable ? (
+        <NativeManualEntrySheet
+          countries={countryOptions}
+          existingRecords={nativeManualEntryRecords}
+          initialDate={selectedDateInMonth}
+          palette={{
+            actionPrimaryFill: palette.actionPrimaryFill,
+            actionPrimaryForeground: palette.actionPrimaryForeground,
+            actionSecondaryBorder: palette.actionSecondaryBorder,
+            actionSecondaryFill: palette.actionSecondaryFill,
+            card: palette.card,
+            chipFill: palette.chipFill,
+            errorBorder: palette.errorBorder,
+            errorFill: palette.errorFill,
+            errorText: palette.errorText,
+            foreground: palette.foreground,
+            inputBorder: palette.inputBorder,
+            inputFill: palette.inputFill,
+            menuGlassFill: palette.menuGlassFill,
+            muted: palette.muted,
+            placeholder: palette.placeholder,
+            selectedBorder: palette.selectedBorder,
+            selectedFill: palette.selectedFill,
+            selectedForeground: palette.selectedForeground,
+            weekday: palette.weekday
+          }}
+          visible={isManualEntryOpen}
+          onClose={() => setIsManualEntryOpen(false)}
+          onConfirm={(entry) => {
+            void (async () => {
+              try {
+                await insertManualEntry(entry);
+                setIsManualEntryOpen(false);
+              } catch (error) {
+                Alert.alert("Insert failed", error instanceof Error ? error.message : "Could not insert manual entry.");
+              }
+            })();
+          }}
+        />
+      ) : (
+        <ManualEntryDrawer
+          existingRecordsByDate={yearRecordsByDate}
+          initialDate={selectedDateInMonth}
+          palette={palette}
+          visible={isManualEntryOpen}
+          onClose={() => setIsManualEntryOpen(false)}
+          onConfirm={async (entry) => {
+            await insertManualEntry(entry);
+            setIsManualEntryOpen(false);
+          }}
+        />
+      )}
+      {isNativeEditDaySheetAvailable ? (
+        <NativeEditDaySheet
+          canDelete={Boolean(editingRecord)}
+          countries={countryOptions}
+          initialCountryInput={editingRecord?.primary_country_name ?? editingRecord?.primary_country_code ?? ""}
+          initialDate={editingDate ?? selectedDateInMonth}
+          palette={palette}
+          visible={Boolean(editingDate)}
+          onClose={() => setEditingDate(null)}
+          onConfirm={(entry) => {
+            void (async () => {
+              try {
+                await updateDay(entry);
+                setEditingDate(null);
+              } catch (error) {
+                Alert.alert("Update failed", error instanceof Error ? error.message : "Could not update this day.");
+              }
+            })();
+          }}
+          onDelete={(date) => {
+            void (async () => {
+              try {
+                await deleteDay(date);
+                setEditingDate(null);
+              } catch (error) {
+                Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete this day.");
+              }
+            })();
+          }}
+        />
+      ) : (
+        <DayEditDrawer
+          canDelete={Boolean(editingRecord)}
+          initialCountryInput={editingRecord?.primary_country_name ?? editingRecord?.primary_country_code ?? ""}
+          initialDate={editingDate ?? selectedDateInMonth}
+          palette={palette}
+          visible={Boolean(editingDate)}
+          onClose={() => setEditingDate(null)}
+          onConfirm={async (entry) => {
+            await updateDay(entry);
+            setEditingDate(null);
+          }}
+          onDelete={async (date) => {
+            await deleteDay(date);
+            setEditingDate(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -533,6 +798,33 @@ type MonthSummary = {
   untrackedDays: number;
   topCountries: Array<{ code: string; name: string; days: number }>;
 };
+
+function MonthHeaderButton({ label, palette, style, onPress }: { label: string; palette: ReturnType<typeof getPalette>; style?: StyleProp<ViewStyle>; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Change month and year, ${label}`}
+      style={({ pressed }) => [
+        styles.monthLabel,
+        style,
+        {
+          borderColor: palette.actionPrimaryFill,
+          shadowColor: palette.glassShadow
+        },
+        pressed ? styles.monthLabelPressed : null
+      ]}
+      onPress={onPress}
+    >
+      <BlurView intensity={84} pointerEvents="none" tint={palette.basicBlurTint} style={[StyleSheet.absoluteFill, styles.monthLabelGlass]} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.monthLabelOverlay, { backgroundColor: palette.actionPrimaryFill, borderColor: palette.actionPrimaryFill }]} />
+      <View pointerEvents="none" style={[styles.monthLabelSheen, { backgroundColor: palette.monthLabelSheen }]} />
+      <View pointerEvents="none" style={[styles.monthLabelBottomGlow, { backgroundColor: palette.monthLabelBottomGlow }]} />
+      <View style={styles.monthLabelContent}>
+        <BlurReplaceText value={label} numberOfLines={1} adjustsFontSizeToFit style={[styles.monthText, { color: palette.actionPrimaryForeground }]} />
+      </View>
+    </Pressable>
+  );
+}
 
 type MonthSummaryRecord = {
   date: string;
@@ -558,9 +850,12 @@ function MonthSummaryPanel({ palette, summary }: { palette: ReturnType<typeof ge
         <Text className="text-sm font-extrabold" style={{ color: palette.foreground }}>
           Month Summary
         </Text>
-        <Text className="text-xs font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted, flexShrink: 0 }}>
-          {summary.recordedDays}/{summary.totalDays} days tracked
-        </Text>
+        <BlurReplaceText
+          value={`${summary.recordedDays}/${summary.totalDays} days tracked`}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={[styles.monthSummaryTrackedText, { color: palette.muted }]}
+        />
       </View>
 
       <View style={styles.monthSummaryMetrics}>
@@ -571,13 +866,15 @@ function MonthSummaryPanel({ palette, summary }: { palette: ReturnType<typeof ge
       </View>
 
       <View style={[styles.monthSummaryFooter, { borderTopColor: palette.inputBorder }]}>
-        <Text className="text-xs font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted, flex: 1, minWidth: 0 }}>
-          {countrySummary}
-        </Text>
+        <BlurReplaceText
+          value={countrySummary}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          containerStyle={styles.monthSummaryCountryStage}
+          style={[styles.monthSummaryCountryText, { color: palette.muted }]}
+        />
         {statusSummary ? (
-          <Text className="text-xs font-semibold" style={{ color: palette.weekday }}>
-            {statusSummary}
-          </Text>
+          <BlurReplaceText value={statusSummary} style={[styles.monthSummaryStatusText, { color: palette.weekday }]} />
         ) : null}
       </View>
     </View>
@@ -587,9 +884,7 @@ function MonthSummaryPanel({ palette, summary }: { palette: ReturnType<typeof ge
 function MonthSummaryMetric({ label, value, palette }: { label: string; value: number; palette: ReturnType<typeof getPalette> }) {
   return (
     <View style={[styles.monthSummaryMetric, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
-      <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
-        {value}
-      </Text>
+      <BlurReplaceText value={String(value)} style={[styles.monthSummaryMetricValue, { color: palette.foreground }]} />
       <Text className="text-[10px] font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.muted }}>
         {label}
       </Text>
@@ -649,6 +944,21 @@ function buildMonthSummary(records: MonthSummaryRecord[], month: Date): MonthSum
     untrackedDays: Math.max(0, totalDays - recordedDays),
     topCountries
   };
+}
+
+function getCalendarScrollRange(anchorMonth: Date) {
+  const anchorIndex = getMonthIndex(anchorMonth);
+  const minIndex = CALENDAR_MIN_YEAR * 12;
+  const maxIndex = CALENDAR_MAX_YEAR * 12 + 11;
+
+  return {
+    pastScrollRange: Math.max(0, anchorIndex - minIndex),
+    futureScrollRange: Math.max(0, maxIndex - anchorIndex)
+  };
+}
+
+function getMonthIndex(date: Date) {
+  return date.getFullYear() * 12 + date.getMonth();
 }
 
 function MonthYearPicker({
@@ -795,9 +1105,7 @@ function MonthYearPicker({
               <Pressable accessibilityRole="button" accessibilityLabel="Previous year" style={styles.pickerIconButton} onPress={() => updateYear(draftYear - 1)}>
                 <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
               </Pressable>
-              <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
-                {draftYear}
-              </Text>
+              <BlurReplaceText value={String(draftYear)} style={[styles.monthPickerYearText, { color: palette.foreground }]} />
               <Pressable accessibilityRole="button" accessibilityLabel="Next year" style={styles.pickerIconButton} onPress={() => updateYear(draftYear + 1)}>
                 <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
               </Pressable>
@@ -820,6 +1128,7 @@ function MonthYearPicker({
                     ]}
                     onPress={() => setDraftMonth(index)}
                   >
+                    <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
                     <Text className="text-sm font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }}>
                       {name}
                     </Text>
@@ -829,17 +1138,8 @@ function MonthYearPicker({
             </View>
 
             <View style={styles.drawerActions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Cancel month selection" style={[styles.secondaryAction, { backgroundColor: palette.chipFill, borderColor: palette.inputBorder }]} onPress={onClose}>
-                <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Confirm month selection" style={[styles.primaryAction, { backgroundColor: palette.foreground }]} onPress={confirmSelection}>
-                <Check size={18} color={palette.screen} strokeWidth={iconStrokeWidth} />
-                <Text className="text-sm font-bold" style={{ color: palette.screen }}>
-                  Confirm
-                </Text>
-              </Pressable>
+              <DrawerActionButton backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+              <DrawerActionButton backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={confirmSelection} />
             </View>
           </View>
         </Animated.View>
@@ -849,12 +1149,14 @@ function MonthYearPicker({
 }
 
 function ManualEntryDrawer({
+  existingRecordsByDate,
   initialDate,
   palette,
   visible,
   onClose,
   onConfirm
 }: {
+  existingRecordsByDate: ReadonlyMap<string, DayRecordPreview>;
   initialDate: string;
   palette: ReturnType<typeof getPalette>;
   visible: boolean;
@@ -862,11 +1164,10 @@ function ManualEntryDrawer({
   onConfirm: (entry: ManualTravelEntry) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset(insets.bottom);
   const [isRendered, setIsRendered] = useState(visible);
-  const [draftYear, setDraftYear] = useState(Number(initialDate.slice(0, 4)));
   const [startDate, setStartDate] = useState(initialDate);
-  const [endDate, setEndDate] = useState(initialDate);
-  const [pickerMonth, setPickerMonth] = useState(() => startOfMonth(parseISO(initialDate)));
+  const [endDate, setEndDate] = useState(() => getDefaultManualEndDate(initialDate));
   const [activeDateField, setActiveDateField] = useState<"start" | "end">("start");
   const [countryInput, setCountryInput] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -876,10 +1177,8 @@ function ManualEntryDrawer({
 
   useEffect(() => {
     if (visible) {
-      setDraftYear(Number(initialDate.slice(0, 4)));
       setStartDate(initialDate);
-      setEndDate(initialDate);
-      setPickerMonth(startOfMonth(parseISO(initialDate)));
+      setEndDate(getDefaultManualEndDate(initialDate));
       setActiveDateField("start");
       setCountryInput("");
       setErrorMessage(null);
@@ -946,9 +1245,6 @@ function ManualEntryDrawer({
   }, [countryInput]);
 
   const selectedCountry = resolveCountry(countryInput);
-  const pickerCells = useMemo(() => buildCalendarCells(pickerMonth), [pickerMonth]);
-  const canGoToPreviousPickerMonth = pickerMonth.getFullYear() > draftYear || pickerMonth.getMonth() > 0;
-  const canGoToNextPickerMonth = pickerMonth.getFullYear() < draftYear || pickerMonth.getMonth() < 11;
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: progress.value * interpolate(dragY.value, [0, 260], [1, 0.2], Extrapolation.CLAMP)
@@ -970,29 +1266,15 @@ function ManualEntryDrawer({
     ]
   }));
 
-  function updateDraftYear(value: number) {
-    const nextYear = Math.max(1900, Math.min(2100, value));
-    const nextYearText = String(nextYear);
-    const nextStartDate = replaceIsoYear(startDate, nextYearText);
-    const nextEndDate = replaceIsoYear(endDate, nextYearText);
+  function updateDateField(field: "start" | "end", date: Date) {
+    const iso = format(date, "yyyy-MM-dd");
+    setActiveDateField(field);
+    setErrorMessage(null);
 
-    setDraftYear(nextYear);
-    setStartDate(nextStartDate);
-    setEndDate(nextEndDate);
-    setPickerMonth(startOfMonth(parseISO(activeDateField === "start" ? nextStartDate : nextEndDate)));
-  }
-
-  function shiftPickerMonth(direction: -1 | 1) {
-    const nextMonth = direction === 1 ? addMonths(pickerMonth, 1) : subMonths(pickerMonth, 1);
-    if (nextMonth.getFullYear() !== draftYear) return;
-    setPickerMonth(nextMonth);
-  }
-
-  function selectPickerDate(iso: string) {
-    if (activeDateField === "start") {
+    if (field === "start") {
+      const defaultEndDate = getDefaultManualEndDate(iso);
       setStartDate(iso);
-      if (iso > endDate) setEndDate(iso);
-      setActiveDateField("end");
+      setEndDate(defaultEndDate);
       return;
     }
 
@@ -1001,7 +1283,7 @@ function ManualEntryDrawer({
   }
 
   async function submit() {
-    const result = buildManualEntry(String(draftYear), startDate, endDate, countryInput);
+    const result = buildManualEntry(startDate, endDate, countryInput);
     if ("message" in result) {
       setErrorMessage(result.message);
       return;
@@ -1017,11 +1299,104 @@ function ManualEntryDrawer({
     }
   }
 
+  const manualContent = (
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
+      <View style={styles.drawerHeaderRow}>
+        <View style={[styles.drawerIcon, { backgroundColor: palette.card }]}>
+          <PencilLine size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+        </View>
+        <View style={styles.drawerHeaderText}>
+          <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
+            Manual Entry
+          </Text>
+          <Text className="text-xs" style={{ color: palette.muted }}>
+            History
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.manualForm}>
+        <CalendarDateRangeFields
+          activeField={activeDateField}
+          endDate={endDate}
+          existingRecordsByDate={existingRecordsByDate}
+          palette={palette}
+          startDate={startDate}
+          onActiveFieldChange={setActiveDateField}
+          onDateChange={updateDateField}
+        />
+
+        <View style={styles.fieldGroup}>
+          <Text className="text-xs font-bold" style={{ color: palette.muted }}>
+            Country
+          </Text>
+          <View style={[styles.countryInputShell, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
+            <Globe2 size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
+            <TextInput
+              accessibilityLabel="Manual entry country"
+              autoCapitalize="words"
+              placeholder="Country name or code"
+              placeholderTextColor={palette.placeholder}
+              style={[styles.countryInput, { color: palette.foreground }]}
+              value={countryInput}
+              onChangeText={(value) => {
+                setCountryInput(value);
+                setErrorMessage(null);
+              }}
+            />
+          </View>
+        </View>
+
+        <View style={styles.countryChips}>
+          {matchingCountryOptions.map((country) => {
+            const selected = selectedCountry?.code === country.code;
+            return (
+              <Pressable
+                key={country.code}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${country.name} ${country.code}`}
+                style={[
+                  styles.countryChip,
+                  {
+                    backgroundColor: selected ? palette.selectedFill : palette.chipFill,
+                    borderColor: selected ? palette.selectedBorder : palette.inputBorder
+                  }
+                ]}
+                onPress={() => {
+                  setCountryInput(country.name);
+                  setErrorMessage(null);
+                }}
+              >
+                <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
+                <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
+                  {country.name} ({country.code})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {errorMessage ? (
+          <View style={[styles.errorBox, { backgroundColor: palette.errorFill, borderColor: palette.errorBorder }]}>
+            <Text className="text-xs font-bold" style={{ color: palette.errorText }}>
+              {errorMessage}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.drawerActions}>
+        <DrawerActionButton disabled={isSaving} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+        <DrawerActionButton disabled={isSaving} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Inserting" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
+      </View>
+    </ScrollView>
+  );
+
   if (!isRendered) return null;
 
   return (
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalRoot}>
+      <View style={styles.modalRoot}>
         <FadingBlurLayer tint={palette.blurTint} intensity={18} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={backdropBlurStyle} />
         <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
@@ -1032,6 +1407,7 @@ function ManualEntryDrawer({
             styles.manualDrawer,
             {
               borderColor: palette.glassBorder,
+              bottom: keyboardInset,
               paddingBottom: Math.max(insets.bottom, 12),
               shadowColor: palette.glassShadow
             },
@@ -1048,205 +1424,40 @@ function ManualEntryDrawer({
             </Animated.View>
           </GestureDetector>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
-            <View style={styles.drawerHeaderRow}>
-              <View style={[styles.drawerIcon, { backgroundColor: palette.card }]}>
-                <PencilLine size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-              </View>
-              <View style={styles.drawerHeaderText}>
-                <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
-                  Manual Entry
-                </Text>
-                <Text className="text-xs" style={{ color: palette.muted }}>
-                  History
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.manualForm}>
-              <View style={styles.fieldGroup}>
-                <Text className="text-xs font-bold" style={{ color: palette.muted }}>
-                  Year
-                </Text>
-                <View style={[styles.yearPicker, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Previous year" style={styles.pickerIconButton} onPress={() => updateDraftYear(draftYear - 1)}>
-                    <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-                  </Pressable>
-                  <Text className="text-lg font-extrabold" style={{ color: palette.foreground }}>
-                    {draftYear}
-                  </Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Next year" style={styles.pickerIconButton} onPress={() => updateDraftYear(draftYear + 1)}>
-                    <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.dateRangePicker}>
-                <DateBoundaryButton active={activeDateField === "start"} label="Start" iso={startDate} palette={palette} onPress={() => setActiveDateField("start")} />
-                <DateBoundaryButton active={activeDateField === "end"} label="End" iso={endDate} palette={palette} onPress={() => setActiveDateField("end")} />
-              </View>
-
-              <View style={[styles.calendarPicker, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
-                <View style={styles.calendarPickerHeader}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Previous month" disabled={!canGoToPreviousPickerMonth} style={[styles.pickerIconButton, !canGoToPreviousPickerMonth && styles.disabledControl]} onPress={() => shiftPickerMonth(-1)}>
-                    <ChevronLeft size={21} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-                  </Pressable>
-                  <View style={styles.calendarPickerTitle}>
-                    <CalendarDays size={16} color={palette.muted} strokeWidth={iconStrokeWidth} />
-                    <Text className="text-sm font-extrabold" style={{ color: palette.foreground }}>
-                      {format(pickerMonth, "MMMM yyyy")}
-                    </Text>
-                  </View>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Next month" disabled={!canGoToNextPickerMonth} style={[styles.pickerIconButton, !canGoToNextPickerMonth && styles.disabledControl]} onPress={() => shiftPickerMonth(1)}>
-                    <ChevronRight size={21} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.pickerWeekdayRow}>
-                  {weekdays.map((day) => (
-                    <Text key={day} className="text-[10px] font-bold" style={[styles.pickerWeekdayText, { color: palette.weekday }]}>
-                      {day.slice(0, 1)}
-                    </Text>
-                  ))}
-                </View>
-
-                <View style={styles.pickerGrid}>
-                  {chunk(pickerCells, 7).map((week, weekIndex) => (
-                    <View key={`picker-week-${weekIndex}`} style={styles.pickerWeekRow}>
-                      {week.map((cell) => {
-                        if (cell.isBlank) {
-                          return <View key={cell.key} style={styles.pickerDayBlankCell} />;
-                        }
-
-                        const inRange = cell.iso >= startDate && cell.iso <= endDate;
-                        const isStart = cell.iso === startDate;
-                        const isEnd = cell.iso === endDate;
-                        const isSelected = isStart || isEnd;
-
-                        return (
-                          <Pressable
-                            key={cell.iso}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Select ${format(cell.date, "MMMM d, yyyy")}`}
-                            style={[
-                              styles.pickerDayCell,
-                              {
-                                backgroundColor: isSelected ? palette.selectedFill : inRange ? palette.chipFill : "transparent",
-                                borderColor: isSelected ? palette.selectedBorder : "transparent"
-                              }
-                            ]}
-                            onPress={() => selectPickerDate(cell.iso)}
-                          >
-                            <Text className="text-xs font-bold" style={{ color: isSelected ? palette.selectedForeground : palette.foreground }}>
-                              {format(cell.date, "d")}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text className="text-xs font-bold" style={{ color: palette.muted }}>
-                  Country
-                </Text>
-                <View style={[styles.countryInputShell, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
-                  <Globe2 size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
-                  <TextInput
-                    accessibilityLabel="Manual entry country"
-                    autoCapitalize="words"
-                    placeholder="Country name or code"
-                    placeholderTextColor={palette.placeholder}
-                    style={[styles.countryInput, { color: palette.foreground }]}
-                    value={countryInput}
-                    onChangeText={(value) => {
-                      setCountryInput(value);
-                      setErrorMessage(null);
-                    }}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.countryChips}>
-                {matchingCountryOptions.map((country) => {
-                  const selected = selectedCountry?.code === country.code;
-                  return (
-                    <Pressable
-                      key={country.code}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Select ${country.name} ${country.code}`}
-                      style={[
-                        styles.countryChip,
-                        {
-                          backgroundColor: selected ? palette.selectedFill : palette.chipFill,
-                          borderColor: selected ? palette.selectedBorder : palette.inputBorder
-                        }
-                      ]}
-                      onPress={() => {
-                        setCountryInput(country.name);
-                        setErrorMessage(null);
-                      }}
-                    >
-                      <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
-                        {country.name} ({country.code})
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {errorMessage ? (
-                <View style={[styles.errorBox, { backgroundColor: palette.errorFill, borderColor: palette.errorBorder }]}>
-                  <Text className="text-xs font-bold" style={{ color: palette.errorText }}>
-                    {errorMessage}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={styles.drawerActions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Cancel manual entry" disabled={isSaving} style={[styles.secondaryAction, { backgroundColor: palette.chipFill, borderColor: palette.inputBorder }]} onPress={onClose}>
-                <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Confirm manual entry" disabled={isSaving} style={[styles.primaryAction, { backgroundColor: palette.foreground, opacity: isSaving ? 0.65 : 1 }]} onPress={() => void submit()}>
-                <Check size={18} color={palette.screen} strokeWidth={iconStrokeWidth} />
-                <Text className="text-sm font-bold" style={{ color: palette.screen }}>
-                  {isSaving ? "Inserting" : "Confirm"}
-                </Text>
-              </Pressable>
-            </View>
-          </ScrollView>
+          {manualContent}
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 function DayEditDrawer({
+  canDelete,
   initialCountryInput,
   initialDate,
   palette,
   visible,
   onClose,
-  onConfirm
+  onConfirm,
+  onDelete
 }: {
+  canDelete: boolean;
   initialCountryInput: string;
   initialDate: string;
   palette: ReturnType<typeof getPalette>;
   visible: boolean;
   onClose: () => void;
   onConfirm: (entry: DayLocationEntry) => Promise<void>;
+  onDelete: (date: string) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset(insets.bottom);
   const [isRendered, setIsRendered] = useState(visible);
   const [draftDate, setDraftDate] = useState(initialDate);
   const [countryInput, setCountryInput] = useState(initialCountryInput);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const progress = useSharedValue(visible ? 1 : 0);
   const dragY = useSharedValue(0);
 
@@ -1256,6 +1467,7 @@ function DayEditDrawer({
       setCountryInput(initialCountryInput);
       setErrorMessage(null);
       setIsSaving(false);
+      setIsDeleting(false);
       setIsRendered(true);
       dragY.value = 0;
       progress.value = withSpring(1, {
@@ -1340,6 +1552,8 @@ function DayEditDrawer({
   }));
 
   async function submit() {
+    if (isDeleting) return;
+
     const result = buildDayLocationEntry(initialDate, draftDate, countryInput);
     if ("message" in result) {
       setErrorMessage(result.message);
@@ -1356,11 +1570,37 @@ function DayEditDrawer({
     }
   }
 
+  function confirmDelete() {
+    if (isSaving || isDeleting) return;
+
+    Alert.alert("Delete history entry?", `This removes ${initialDate} from History.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void deleteEntry();
+        }
+      }
+    ]);
+  }
+
+  async function deleteEntry() {
+    setErrorMessage(null);
+    setIsDeleting(true);
+    try {
+      await onDelete(initialDate);
+    } catch (error) {
+      setIsDeleting(false);
+      setErrorMessage(error instanceof Error ? error.message : "Could not delete this day.");
+    }
+  }
+
   if (!isRendered) return null;
 
   return (
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalRoot}>
+      <View style={styles.modalRoot}>
         <FadingBlurLayer tint={palette.blurTint} intensity={18} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} blurStyle={backdropBlurStyle} />
         <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.drawerBackdrop }]} />
@@ -1371,6 +1611,7 @@ function DayEditDrawer({
             styles.manualDrawer,
             {
               borderColor: palette.glassBorder,
+              bottom: keyboardInset,
               paddingBottom: Math.max(insets.bottom, 12),
               shadowColor: palette.glassShadow
             },
@@ -1400,6 +1641,19 @@ function DayEditDrawer({
                   Final location
                 </Text>
               </View>
+              {canDelete ? (
+                <Pressable
+                  accessibilityLabel={isDeleting ? "Deleting" : "Delete"}
+                  accessibilityRole="button"
+                  disabled={isSaving || isDeleting}
+                  hitSlop={8}
+                  style={[styles.drawerHeaderDeleteButton, { backgroundColor: palette.destructiveFill, borderColor: palette.destructiveBorder }, isSaving || isDeleting ? styles.disabledHeaderButton : null]}
+                  onPress={confirmDelete}
+                >
+                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={palette.destructiveFill} style={StyleSheet.absoluteFill} />
+                  <Trash2 size={19} color={palette.destructiveForeground} strokeWidth={iconStrokeWidth} />
+                </Pressable>
+              ) : null}
             </View>
 
             <View style={styles.manualForm}>
@@ -1463,6 +1717,7 @@ function DayEditDrawer({
                         setErrorMessage(null);
                       }}
                     >
+                      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
                       <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
                         {country.name} ({country.code})
                       </Text>
@@ -1481,35 +1736,203 @@ function DayEditDrawer({
             </View>
 
             <View style={styles.drawerActions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Cancel day edit" disabled={isSaving} style={[styles.secondaryAction, { backgroundColor: palette.chipFill, borderColor: palette.inputBorder }]} onPress={onClose}>
-                <Text className="text-sm font-bold" style={{ color: palette.foreground }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Update day" disabled={isSaving} style={[styles.primaryAction, { backgroundColor: palette.foreground, opacity: isSaving ? 0.65 : 1 }]} onPress={() => void submit()}>
-                <Check size={18} color={palette.screen} strokeWidth={iconStrokeWidth} />
-                <Text className="text-sm font-bold" style={{ color: palette.screen }}>
-                  {isSaving ? "Updating" : "Update"}
-                </Text>
-              </Pressable>
+              <DrawerActionButton disabled={isSaving || isDeleting} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+              <DrawerActionButton disabled={isSaving || isDeleting} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Updating" : "Update"} style={styles.nativeActionButton} onPress={() => void submit()} />
             </View>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
-function DateBoundaryButton({
+function CalendarDateRangeFields({
+  activeField,
+  endDate,
+  existingRecordsByDate,
+  palette,
+  startDate,
+  onActiveFieldChange,
+  onDateChange
+}: {
+  activeField: "start" | "end";
+  endDate: string;
+  existingRecordsByDate: ReadonlyMap<string, DayRecordPreview>;
+  palette: ReturnType<typeof getPalette>;
+  startDate: string;
+  onActiveFieldChange: (field: "start" | "end") => void;
+  onDateChange: (field: "start" | "end", date: Date) => void;
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(parseISO(startDate)));
+  const activeMinDate = activeField === "end" ? startDate : MANUAL_ENTRY_MIN_DATE;
+  const activeMaxDate = MANUAL_ENTRY_MAX_DATE;
+  const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
+  const previousMonth = subMonths(visibleMonth, 1);
+  const nextMonth = addMonths(visibleMonth, 1);
+  const canShowPreviousMonth = format(endOfMonth(previousMonth), "yyyy-MM-dd") >= activeMinDate;
+  const canShowNextMonth = format(startOfMonth(nextMonth), "yyyy-MM-dd") <= activeMaxDate;
+  const todayIso = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+
+  function selectDate(iso: string) {
+    if (iso < activeMinDate || iso > activeMaxDate) return;
+
+    onDateChange(activeField, parseISO(iso));
+    setVisibleMonth(startOfMonth(parseISO(iso)));
+    if (activeField === "start") {
+      onActiveFieldChange("end");
+    }
+  }
+
+  return (
+    <View style={styles.rangeSelector}>
+      <View style={styles.dateRangePicker}>
+        <RangeBoundaryButton
+          active={activeField === "start"}
+          iso={startDate}
+          label="Start"
+          palette={palette}
+          onPress={() => {
+            onActiveFieldChange("start");
+            setVisibleMonth(startOfMonth(parseISO(startDate)));
+          }}
+        />
+        <RangeBoundaryButton
+          active={activeField === "end"}
+          iso={endDate}
+          label="End"
+          palette={palette}
+          onPress={() => {
+            onActiveFieldChange("end");
+            setVisibleMonth(startOfMonth(parseISO(endDate)));
+          }}
+        />
+      </View>
+
+      <View style={[styles.rangeCalendarShell, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
+        <View style={styles.rangeCalendarHeader}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            disabled={!canShowPreviousMonth}
+            hitSlop={8}
+            style={styles.rangeCalendarNavButton}
+            onPress={() => setVisibleMonth(previousMonth)}
+          >
+            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={36} tint={palette.blurTint} style={StyleSheet.absoluteFill} />
+            <ChevronLeft size={22} color={palette.foreground} opacity={canShowPreviousMonth ? 1 : 0.26} strokeWidth={iconStrokeWidth} />
+          </Pressable>
+          <Text className="text-sm font-extrabold" style={{ color: palette.foreground }}>
+            {format(visibleMonth, "MMMM yyyy")}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            disabled={!canShowNextMonth}
+            hitSlop={8}
+            style={styles.rangeCalendarNavButton}
+            onPress={() => setVisibleMonth(nextMonth)}
+          >
+            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={36} tint={palette.blurTint} style={StyleSheet.absoluteFill} />
+            <ChevronRight size={22} color={palette.foreground} opacity={canShowNextMonth ? 1 : 0.26} strokeWidth={iconStrokeWidth} />
+          </Pressable>
+        </View>
+
+        <View style={styles.rangeWeekdayRow}>
+          {weekdays.map((weekday) => (
+            <Text key={weekday} className="text-[10px] font-bold" style={[styles.rangeWeekdayText, { color: palette.weekday }]}>
+              {weekday}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.rangeMonthGrid}>
+          {monthCells.map((cell, index) => {
+            if (!cell) return <View key={`empty-${index}`} style={styles.rangeDayCell} />;
+
+            const disabled = cell.iso < activeMinDate || cell.iso > activeMaxDate;
+            const inRange = cell.iso >= startDate && cell.iso <= endDate;
+            const isStart = cell.iso === startDate;
+            const isEnd = cell.iso === endDate;
+            const isSelected = isStart || isEnd;
+            const isOnlyDay = startDate === endDate && isSelected;
+            const isFutureUnselected = cell.iso > todayIso && !inRange;
+            const dayOpacity = disabled ? 0.34 : isFutureUnselected ? 0.62 : 1;
+            const existingCountryCode = existingRecordsByDate.get(cell.iso)?.primary_country_code ?? null;
+
+            return (
+              <Pressable
+                key={cell.iso}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${format(parseISO(cell.iso), "MMMM d, yyyy")}`}
+                disabled={disabled}
+                style={styles.rangeDayCell}
+                onPress={() => selectDate(cell.iso)}
+              >
+                {inRange && !isOnlyDay ? (
+                  <View
+                    style={[
+                      styles.rangeDayBand,
+                      {
+                        backgroundColor: palette.chipFill,
+                        left: isStart ? "50%" : 0,
+                        right: isEnd ? "50%" : 0
+                      }
+                    ]}
+                  />
+                ) : null}
+                <View style={[styles.rangeDayCircle, { backgroundColor: isSelected ? palette.selectedFill : "transparent", borderColor: isSelected ? palette.selectedBorder : "transparent", opacity: dayOpacity }]}>
+                  <Text className="text-xs font-bold" style={{ color: isSelected ? palette.selectedForeground : palette.foreground }}>
+                    {cell.day}
+                  </Text>
+                </View>
+                {existingCountryCode ? (
+                  <Text className="text-xs" style={[styles.rangeDayFlag, { opacity: dayOpacity }]}>
+                    {flagForCountry(existingCountryCode)}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function buildMonthCells(month: Date) {
+  const monthStart = startOfMonth(month);
+  const monthEnd = endOfMonth(month);
+  const leadingDays = monthStart.getDay();
+  const cells: Array<{ iso: string; day: number } | null> = Array.from({ length: leadingDays }, () => null);
+
+  for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+    const date = new Date(monthStart);
+    date.setDate(day);
+    cells.push({ iso: format(date, "yyyy-MM-dd"), day });
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
+}
+
+function getDefaultManualEndDate(startDate: string) {
+  const nextDay = format(addDays(parseISO(startDate), 1), "yyyy-MM-dd");
+  return nextDay <= MANUAL_ENTRY_MAX_DATE ? nextDay : startDate;
+}
+
+function RangeBoundaryButton({
   active,
-  label,
   iso,
+  label,
   palette,
   onPress
 }: {
   active: boolean;
-  label: string;
   iso: string;
+  label: string;
   palette: ReturnType<typeof getPalette>;
   onPress: () => void;
 }) {
@@ -1526,12 +1949,15 @@ function DateBoundaryButton({
       ]}
       onPress={onPress}
     >
-      <Text className="text-xs font-bold" style={{ color: active ? palette.selectedMutedForeground : palette.muted }}>
-        {label}
-      </Text>
-      <Text className="text-sm font-extrabold" style={{ color: active ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
-        {format(parseISO(iso), "MMM d")}
-      </Text>
+      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={46} tint={palette.blurTint} tintColor={active ? palette.selectedFill : palette.inputFill} style={StyleSheet.absoluteFill} />
+      <View style={styles.dateBoundaryContent}>
+        <Text className="text-xs font-bold" style={{ color: active ? palette.selectedMutedForeground : palette.muted }}>
+          {label}
+        </Text>
+        <Text className="text-sm font-extrabold" style={{ color: active ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
+          {format(parseISO(iso), "MMM d")}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -1541,15 +1967,13 @@ function CalendarAddMenu({
   visible,
   onClose,
   onClosed,
-  onManualEntry,
-  onPhotoScanner
+  onManualEntry
 }: {
   palette: ReturnType<typeof getPalette>;
   visible: boolean;
   onClose: () => void;
   onClosed: () => void;
   onManualEntry: () => void;
-  onPhotoScanner: () => void;
 }) {
   const [isRendered, setIsRendered] = useState(visible);
   const progress = useSharedValue(visible ? 1 : 0);
@@ -1597,27 +2021,27 @@ function CalendarAddMenu({
     <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
-          <GlassBlurLayer tint={palette.blurTint} intensity={18} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.glassBackdrop }]} />
+          <GlassBlurLayer tint={palette.blurTint} intensity={32} style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.menuBackdrop }]} />
         </Animated.View>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View
           style={[
             styles.addMenu,
             {
-              borderColor: palette.glassBorder,
+              backgroundColor: palette.addMenuFill,
+              borderColor: palette.addMenuBorder,
               shadowColor: palette.glassShadow
             },
             menuStyle
           ]}
         >
           <GlassBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
-          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
-          <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
-          <View style={[styles.quickMenuRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
+          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.addMenuFill }]} />
+          <View style={[styles.addMenuHighlight, styles.noPointerEvents, { backgroundColor: palette.addMenuHighlight }]} />
+          <View style={[styles.quickMenuRim, styles.noPointerEvents, { borderColor: palette.addMenuRim }]} />
           <View style={styles.addMenuContent}>
-            <AddMenuAction icon="manual" label="Manual Entry" palette={palette} onPress={onManualEntry} />
-            <AddMenuAction icon="photos" label="Scan Photos" palette={palette} onPress={onPhotoScanner} />
+            <AddMenuAction label="Manual Entry" palette={palette} onPress={onManualEntry} />
           </View>
         </Animated.View>
       </View>
@@ -1626,11 +2050,8 @@ function CalendarAddMenu({
 }
 
 function GlassBlurLayer({ tint, intensity, style }: { tint: ReturnType<typeof getPalette>["blurTint"]; intensity: number; style?: StyleProp<ViewStyle> }) {
-  if (Platform.OS === "web") {
-    return <BlurView tint={tint} intensity={intensity} style={style} />;
-  }
-
-  return <View style={[style, { backgroundColor: tint === "dark" ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.08)" }]} />;
+  if (Platform.OS === "web") return <BlurView tint={tint} intensity={intensity} style={style} />;
+  return <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={intensity} tint={tint} style={style} />;
 }
 
 function FadingBlurLayer({
@@ -1651,12 +2072,34 @@ function FadingBlurLayer({
   );
 }
 
-function AddMenuAction({ icon, label, onPress, palette }: { icon: "manual" | "photos"; label: string; onPress: () => void; palette: ReturnType<typeof getPalette> }) {
-  const Icon = icon === "manual" ? PencilLine : Images;
+function useKeyboardInset(safeAreaBottom: number) {
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
+  useEffect(() => {
+    if (Platform.OS === "web") return undefined;
+
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(Math.max(0, event.endCoordinates.height - safeAreaBottom));
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardInset(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [safeAreaBottom]);
+
+  return keyboardInset;
+}
+
+function AddMenuAction({ label, onPress, palette }: { label: string; onPress: () => void; palette: ReturnType<typeof getPalette> }) {
   return (
     <Pressable accessibilityRole="menuitem" accessibilityLabel={label} style={styles.addMenuAction} onPress={onPress}>
-      <Icon size={28} color={palette.foreground} strokeWidth={iconStrokeWidth} />
+      <PencilLine size={28} color={palette.foreground} strokeWidth={iconStrokeWidth} />
       <Text className="flex-1 text-lg" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
         {label}
       </Text>
@@ -1675,10 +2118,8 @@ function buildCountryOptions(): CountryOption[] {
   return [...priorityOptions, ...remainingOptions];
 }
 
-function buildManualEntry(year: string, startDate: string, endDate: string, countryInput: string): { entry: ManualTravelEntry } | { message: string } {
-  if (!/^\d{4}$/.test(year)) return { message: "Enter a 4-digit year." };
+function buildManualEntry(startDate: string, endDate: string, countryInput: string): { entry: ManualTravelEntry } | { message: string } {
   if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate)) return { message: "Enter dates as YYYY-MM-DD." };
-  if (startDate.slice(0, 4) !== year || endDate.slice(0, 4) !== year) return { message: "Start and end dates must use the selected year." };
   if (startDate > endDate) return { message: "End date must be on or after start date." };
 
   const country = resolveCountry(countryInput);
@@ -1714,12 +2155,6 @@ function isValidIsoDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function replaceIsoYear(value: string, year: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${year}-01-01`;
-  const candidate = `${year}${value.slice(4)}`;
-  return isValidIsoDate(candidate) ? candidate : `${year}-01-01`;
 }
 
 function resolveCountry(input: string) {
@@ -1774,29 +2209,6 @@ function normalizeSearchText(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function buildCalendarCells(month: Date): CalendarCell[] {
-  const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
-  const leadingBlanks = getDay(startOfMonth(month));
-  const cells: CalendarCell[] = [
-    ...Array.from({ length: leadingBlanks }, (_, index) => ({ key: `leading-${index}`, isBlank: true }) as const),
-    ...days.map((date) => ({ date, iso: format(date, "yyyy-MM-dd"), isBlank: false }) as const)
-  ];
-  const trailingBlanks = (7 - (cells.length % 7)) % 7;
-
-  return [
-    ...cells,
-    ...Array.from({ length: trailingBlanks }, (_, index) => ({ key: `trailing-${index}`, isBlank: true }) as const)
-  ];
-}
-
-function chunk<T>(items: T[], size: number) {
-  const rows: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    rows.push(items.slice(index, index + size));
-  }
-  return rows;
-}
-
 function flagForCountry(countryCode: string) {
   if (countryCode.length !== 2) return countryCode;
   const codePoints = countryCode
@@ -1815,24 +2227,45 @@ function getPalette(isDark: boolean) {
     foreground: neutral.foreground,
     muted: neutral.foregroundSecondary,
     weekday: neutral.foregroundTertiary,
+    weekdayHeader: isDark ? "#f2f2f7" : "#0a0a0a",
     accent: neutral.primary,
+    accentForeground: neutral.primaryForeground,
+    actionPrimaryFill: neutral.foreground,
+    actionPrimaryForeground: neutral.backgroundPrimary,
+    actionSecondaryBorder: isDark ? "rgba(255,255,255,0.24)" : "rgba(0,0,0,0.14)",
+    actionSecondaryFill: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
     addButton: isDark ? neutral.backgroundSecondary : "rgba(255,255,255,0.78)",
     addBorder: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
     addShadow: neutral.shadow,
-    blurTint: (isDark ? "dark" : "light") as "dark" | "light",
+    addMenuBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.62)",
+    addMenuFill: isDark ? "rgba(30,30,32,0.88)" : "rgba(255,255,255,0.62)",
+    addMenuHighlight: isDark ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.58)",
+    addMenuRim: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.46)",
+    basicBlurTint: (isDark ? "dark" : "light") as "dark" | "light",
+    blurTint: (isDark ? "systemThinMaterialDark" : "systemThinMaterialLight") as "systemThinMaterialDark" | "systemThinMaterialLight",
     chipFill: isDark ? neutral.backgroundTertiary : "rgba(0,0,0,0.04)",
-    drawerBackdrop: isDark ? "rgba(0,0,0,0.76)" : "rgba(0,0,0,0.24)",
+    drawerBackdrop: isDark ? "rgba(0,0,0,0.46)" : "rgba(0,0,0,0.14)",
     errorBorder: isDark ? "rgba(248,113,113,0.3)" : "rgba(220,38,38,0.2)",
     errorFill: isDark ? "rgba(127,29,29,0.18)" : "rgba(254,226,226,0.72)",
     errorText: isDark ? "#fca5a5" : "#991b1b",
-    glassBackdrop: isDark ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.16)",
-    glassBorder: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
-    glassHighlight: isDark ? "transparent" : "rgba(255,255,255,0.82)",
-    glassRim: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
+    destructiveBorder: isDark ? "rgba(248,113,113,0.46)" : "rgba(185,28,28,0.34)",
+    destructiveFill: isDark ? "#dc2626" : "#dc2626",
+    destructiveForeground: "#ffffff",
+    glassBackdrop: isDark ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.1)",
+    glassBorder: isDark ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.62)",
+    glassHighlight: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.58)",
+    glassRim: isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.46)",
     glassShadow: neutral.shadow,
-    inputBorder: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.09)",
-    inputFill: isDark ? neutral.backgroundSecondary : "rgba(255,255,255,0.76)",
-    menuGlassFill: neutral.backgroundPrimary,
+    inputBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.48)",
+    inputFill: isDark ? "rgba(32,32,34,0.5)" : "rgba(255,255,255,0.52)",
+    menuBackdrop: isDark ? "rgba(0,0,0,0.54)" : "rgba(0,0,0,0.14)",
+    menuGlassFill: isDark ? "rgba(28,28,30,0.96)" : "rgba(255,255,255,0.32)",
+    monthLabelBorder: isDark ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.82)",
+    monthLabelBottomGlow: isDark ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.44)",
+    monthLabelFill: isDark ? "rgba(255,255,255,0.11)" : "rgba(255,255,255,0.42)",
+    monthLabelRim: isDark ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.72)",
+    monthLabelSheen: isDark ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.76)",
+    monthLabelTint: isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.64)",
     selectedBorder: isDark ? "rgba(255,255,255,0.42)" : neutral.foreground,
     selectedFill: isDark ? "#333333" : neutral.foreground,
     selectedForeground: isDark ? neutral.foreground : neutral.backgroundPrimary,
@@ -1849,25 +2282,27 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 18
   },
+  nativeCalendarToolbar: {
+    height: 136,
+    marginBottom: 4
+  },
   topActionRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 44
+    minHeight: 56
   },
   addButton: {
     alignItems: "center",
-    borderCurve: "continuous",
     borderRadius: 999,
-    borderWidth: 1,
     flexShrink: 0,
-    height: 44,
+    height: 48,
     justifyContent: "center",
     overflow: "hidden",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.14,
     shadowRadius: 24,
-    width: 44
+    width: 48
   },
   modalRoot: {
     flex: 1
@@ -1877,26 +2312,34 @@ const styles = StyleSheet.create({
   },
   addMenu: {
     borderCurve: "continuous",
-    borderRadius: 28,
+    borderRadius: 31,
     borderWidth: 1,
     overflow: "hidden",
     position: "absolute",
     right: 16,
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.28,
-    shadowRadius: 34,
-    top: 96,
-    width: 260
+    shadowOpacity: 0.36,
+    shadowRadius: 38,
+    top: 88,
+    width: 282
+  },
+  addMenuHighlight: {
+    height: "48%",
+    left: 1,
+    opacity: 0.46,
+    position: "absolute",
+    right: 1,
+    top: 1
   },
   addMenuContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 14
+    paddingVertical: 8
   },
   addMenuAction: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 16,
-    height: 56
+    gap: 20,
+    height: 64,
+    paddingHorizontal: 28
   },
   countryChips: {
     flexDirection: "row",
@@ -1908,8 +2351,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     maxWidth: "48%",
+    overflow: "hidden",
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 4
   },
   countryInput: {
     flex: 1,
@@ -1928,52 +2372,174 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14
   },
-  calendarPicker: {
-    borderCurve: "continuous",
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12
-  },
-  calendarPickerHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  calendarPickerTitle: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 7
-  },
-  dateField: {
-    flex: 1,
-    minWidth: 0
-  },
   dateBoundaryButton: {
     borderCurve: "continuous",
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
-    gap: 3,
     minWidth: 0,
+    overflow: "hidden",
     paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingVertical: 6
+  },
+  dateBoundaryContent: {
+    gap: 3,
+    zIndex: 1
   },
   dateRangePicker: {
     flexDirection: "row",
     gap: 10
   },
-  dateRow: {
-    flexDirection: "row",
+  rangeSelector: {
     gap: 10
   },
-  disabledControl: {
-    opacity: 0.3
+  rangeCalendarShell: {
+    borderCurve: "continuous",
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+    padding: 10
+  },
+  rangeCalendar: {
+    backgroundColor: "transparent"
+  },
+  rangeCalendarPage: {
+    backgroundColor: "transparent",
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  rangeCalendarContainer: {
+    backgroundColor: "transparent",
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  rangeCalendarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 0,
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  rangeCalendarNavButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 34,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 34
+  },
+  rangeCalendarMonthText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 14,
+    margin: 8
+  },
+  rangeCalendarArrow: {
+    alignItems: "center",
+    height: 36,
+    justifyContent: "center",
+    padding: 0,
+    width: 36
+  },
+  rangeCalendarWeekHeader: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 4
+  },
+  rangeCalendarDayHeader: {
+    flex: 1,
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 16,
+    marginBottom: 2,
+    marginTop: 0,
+    textAlign: "center",
+    width: undefined
+  },
+  rangeCalendarDayContainer: {
+    alignItems: "center",
+    flex: 1
+  },
+  rangeCalendarEmptyDayContainer: {
+    flex: 1,
+    height: 38
+  },
+  rangeCalendarMonthView: {
+    backgroundColor: "transparent"
+  },
+  rangeCalendarWeek: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 1
+  },
+  rangeWeekdayRow: {
+    flexDirection: "row",
+    marginTop: 4
+  },
+  rangeWeekdayText: {
+    flex: 1,
+    lineHeight: 16,
+    textAlign: "center"
+  },
+  rangeMonthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 2
+  },
+  rangeDayCell: {
+    alignItems: "center",
+    flexBasis: "14.2857%",
+    height: 44,
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
+    width: "14.2857%"
+  },
+  rangeDayBand: {
+    height: 30,
+    opacity: 0.85,
+    position: "absolute",
+    top: 4
+  },
+  rangeDayCircle: {
+    alignItems: "center",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: "center",
+    width: 30
+  },
+  rangeDayFlag: {
+    bottom: 0,
+    fontSize: 11,
+    lineHeight: 12,
+    position: "absolute"
   },
   drawerActions: {
+    alignSelf: "stretch",
     flexDirection: "row",
-    gap: 10,
-    marginTop: 20
+    gap: 14,
+    marginTop: 22
+  },
+  nativeActionButton: {
+    flex: 1,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    width: 0
+  },
+  destructiveAction: {
+    alignItems: "center",
+    borderCurve: "continuous",
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: 7,
+    height: 50,
+    justifyContent: "center"
   },
   drawerHandle: {
     alignSelf: "center",
@@ -1995,6 +2561,19 @@ const styles = StyleSheet.create({
   drawerHeaderText: {
     flex: 1,
     minWidth: 0
+  },
+  drawerHeaderDeleteButton: {
+    alignItems: "center",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 42
+  },
+  disabledHeaderButton: {
+    opacity: 0.48
   },
   drawerIcon: {
     alignItems: "center",
@@ -2038,7 +2617,12 @@ const styles = StyleSheet.create({
   },
   manualDrawerContent: {
     paddingHorizontal: 18,
+    paddingBottom: 20,
     paddingTop: 10
+  },
+  nativeManualSheetContent: {
+    flex: 1,
+    maxHeight: "100%"
   },
   manualDrawerRim: {
     ...StyleSheet.absoluteFillObject,
@@ -2100,30 +2684,13 @@ const styles = StyleSheet.create({
     flexBasis: "30.8%",
     flexGrow: 1,
     justifyContent: "center",
-    minHeight: 46
+    minHeight: 46,
+    overflow: "hidden"
   },
   monthPickerHeader: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10
-  },
-  pickerDayCell: {
-    alignItems: "center",
-    aspectRatio: 1,
-    borderCurve: "continuous",
-    borderRadius: 999,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minWidth: 0
-  },
-  pickerDayBlankCell: {
-    aspectRatio: 1,
-    flex: 1,
-    minWidth: 0
-  },
-  pickerGrid: {
-    gap: 4
   },
   pickerIconButton: {
     alignItems: "center",
@@ -2131,17 +2698,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40
-  },
-  pickerWeekdayRow: {
-    flexDirection: "row"
-  },
-  pickerWeekdayText: {
-    flex: 1,
-    textAlign: "center"
-  },
-  pickerWeekRow: {
-    flexDirection: "row",
-    gap: 4
   },
   primaryAction: {
     alignItems: "center",
@@ -2156,7 +2712,7 @@ const styles = StyleSheet.create({
   quickMenuRim: {
     ...StyleSheet.absoluteFillObject,
     borderCurve: "continuous",
-    borderRadius: 28,
+    borderRadius: 31,
     borderWidth: 1
   },
   secondaryAction: {
@@ -2169,10 +2725,6 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   title: {
-    flex: 1,
-    fontFamily: "Inter_800ExtraBold",
-    fontSize: 30,
-    lineHeight: 37,
     paddingRight: 16
   },
   yearPicker: {
@@ -2185,31 +2737,105 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 8
   },
+  monthPickerYearText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+    lineHeight: 24
+  },
   monthRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
     marginTop: 24
+  },
+  monthCenterLabel: {
+    alignSelf: "center",
+    flex: 1,
+    height: 48
   },
   monthLabel: {
     alignItems: "center",
-    flexDirection: "row"
+    alignSelf: "center",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexShrink: 1,
+    height: 48,
+    justifyContent: "center",
+    minWidth: 0,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    paddingVertical: 0,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22
+  },
+  monthLabelBottomGlow: {
+    borderBottomLeftRadius: 999,
+    borderBottomRightRadius: 999,
+    bottom: 0,
+    height: "46%",
+    left: 1,
+    opacity: 0.56,
+    position: "absolute",
+    right: 1
+  },
+  monthLabelContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    minWidth: 0,
+    width: "100%",
+    zIndex: 1
+  },
+  monthLabelGlass: {
+    borderCurve: "continuous",
+    borderRadius: 999,
+    overflow: "hidden"
+  },
+  monthLabelOverlay: {
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    opacity: 1
+  },
+  monthLabelPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.972 }]
+  },
+  monthLabelSheen: {
+    borderRadius: 999,
+    height: 12,
+    left: 20,
+    opacity: 0.72,
+    position: "absolute",
+    right: 20,
+    top: 7
   },
   monthText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 24
-  },
-  monthControls: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 34
+    fontSize: 16,
+    includeFontPadding: false,
+    letterSpacing: 0,
+    lineHeight: 20,
+    textAlign: "center"
   },
   monthButton: {
     alignItems: "center",
-    height: 50,
+    borderRadius: 999,
+    height: 48,
     justifyContent: "center",
-    width: 50
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    width: 48
+  },
+  roundIconButtonPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.96 }]
   },
   monthSummaryPanel: {
     borderCurve: "continuous",
@@ -2224,6 +2850,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between"
+  },
+  monthSummaryTrackedText: {
+    flexShrink: 0,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16
   },
   monthSummaryMetrics: {
     flexDirection: "row",
@@ -2242,6 +2874,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 8
   },
+  monthSummaryMetricValue: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+    lineHeight: 24
+  },
   monthSummaryFooter: {
     alignItems: "center",
     borderTopWidth: 1,
@@ -2250,42 +2887,120 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 10
   },
-  weekdayRow: {
-    flexDirection: "row",
-    marginTop: 24
+  monthSummaryCountryStage: {
+    alignItems: "stretch",
+    flex: 1,
+    minWidth: 0
   },
-  weekdayText: {
+  monthSummaryCountryText: {
+    alignSelf: "stretch",
+    flexShrink: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16,
+    minWidth: 0,
+    textAlign: "left"
+  },
+  monthSummaryStatusText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16
+  },
+  nativeCalendarMonthGrid: {
+    alignSelf: "center",
+    height: 390,
+    marginTop: 40
+  },
+  calendarGrid: {
+    marginTop: 0
+  },
+  weekdayRow: {
+    alignSelf: "center",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+    marginTop: 40,
+    paddingHorizontal: 0
+  },
+  weekdayLabel: {
+    flex: 1,
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  calendarPage: {
+    backgroundColor: "transparent",
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  calendarLibraryContainer: {
+    backgroundColor: "transparent",
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  calendarLibraryDayContainer: {
+    alignItems: "center",
+    flex: 1,
+    minHeight: 56
+  },
+  calendarLibraryDayHeader: {
     flex: 1,
     fontFamily: "Inter_700Bold",
     fontSize: 12,
     lineHeight: 18,
-    textAlign: "center"
+    marginBottom: 0,
+    marginTop: 0,
+    textAlign: "center",
+    width: undefined
   },
-  calendarGrid: {
-    marginTop: 18
+  calendarLibraryEmptyDayContainer: {
+    flex: 1,
+    height: 56
   },
-  weekRow: {
-    flexDirection: "row"
+  calendarLibraryHiddenHeader: {
+    alignItems: "center",
+    height: 0,
+    marginTop: 0,
+    opacity: 0,
+    paddingLeft: 0,
+    paddingRight: 0
+  },
+  calendarLibraryMonthView: {
+    backgroundColor: "transparent"
+  },
+  calendarLibraryWeek: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 0
+  },
+  calendarLibraryWeekHeader: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 12,
+    marginTop: 24
   },
   dayCell: {
     alignItems: "center",
     flex: 1,
     height: 56,
-    justifyContent: "flex-start"
+    justifyContent: "flex-start",
+    width: "100%"
   },
   dayNumber: {
     fontFamily: "Inter_400Regular",
     fontSize: 16,
-    lineHeight: 22
+    lineHeight: 22,
+    textAlign: "center",
+    width: "100%"
   },
   flagText: {
     fontSize: 17,
-    lineHeight: 22,
-    marginTop: 5
-  },
-  flagPlaceholder: {
     height: 22,
-    marginTop: 5
+    lineHeight: 22,
+    marginTop: 5,
+    textAlign: "center",
+    width: "100%"
   },
   spacer: {
     flexGrow: 1,

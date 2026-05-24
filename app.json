@@ -19,8 +19,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "NomadTrack uses your location to build your private travel history and country day counts.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Background location lets the app update your travel history while you are moving.",
-        "NSLocationAlwaysUsageDescription": "Background location lets the app update your travel history while you are moving.",
-        "NSPhotoLibraryUsageDescription": "Photo access is used only when you choose to import travel history from photo metadata."
+        "NSLocationAlwaysUsageDescription": "Background location lets the app update your travel history while you are moving."
       }
     },
     "android": {
@@ -35,8 +34,7 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "READ_MEDIA_IMAGES"
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
@@ -72,7 +70,8 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-web-browser",
-      "./plugins/with-bound-react-native-factory"
+      "./plugins/with-bound-react-native-factory",
+      "expo-router"
     ],
     "extra": {
       "googleIosClientId": "564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i.apps.googleusercontent.com",

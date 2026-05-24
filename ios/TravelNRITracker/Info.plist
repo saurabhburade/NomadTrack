@@ -66,10 +66,6 @@
     <string>Background location lets the app update your travel history while you are moving.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>NomadTrack uses your location to build your private travel history and country day counts.</string>
-    <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to save photos</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Photo access is used only when you choose to import travel history from photo metadata.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UIBackgroundModes</key>

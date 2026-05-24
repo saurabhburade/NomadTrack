@@ -1,8 +1,9 @@
 import { type ComponentProps, type ReactNode } from "react";
-import { Pressable, type PressableProps } from "react-native";
+import { Pressable, StyleSheet, View, type PressableProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Text } from "./text";
 import { cn } from "../../lib/utils";
+import { LiquidGlassLayer } from "../native/LiquidGlassLayer";
 
 export const buttonVariants = cva(
   "h-11 flex-row items-center justify-center gap-2 rounded-lg border px-4 active:opacity-80 disabled:opacity-50",
@@ -53,8 +54,24 @@ type ButtonProps = PressableProps &
 
 export function Button({ className, variant, size, children, ...props }: ButtonProps) {
   return (
-    <Pressable className={cn(buttonVariants({ variant, size }), className)} accessibilityRole="button" {...props}>
-      {typeof children === "string" ? <Text className={textVariants({ variant })}>{children}</Text> : children}
+    <Pressable className={cn(buttonVariants({ variant, size }), "overflow-hidden", className)} accessibilityRole="button" {...props}>
+      <LiquidGlassLayer glassStyle="regular" intensity={72} tint="systemThinMaterial" style={styles.glassLayer} />
+      <View style={styles.content}>
+        {typeof children === "string" ? <Text className={textVariants({ variant })}>{children}</Text> : children}
+      </View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    zIndex: 1
+  },
+  glassLayer: {
+    borderRadius: 999
+  }
+});

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
 import MapView, { Circle, Polygon } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderGlassButton, YearSelectorDrawer, getFiscalYearLabel } from "../components/year-selector-drawer";
+import { NativeGlassButton } from "../components/native/NativeGlassButton";
+import { YearSelectorDrawer, getFiscalYearLabel } from "../components/year-selector-drawer";
 import { Card } from "../components/ui/card";
 import { Text } from "../components/ui/text";
 import { countryBoundaries } from "../data/countryBoundaries";
@@ -18,6 +19,7 @@ const worldRegion = {
   longitudeDelta: 360
 };
 const mapAnimationDurationMs = 460;
+const dashboardHeaderTopSpacing = 20;
 
 export function MapScreen() {
   const { mapPoints, trips, settings, summary, refresh, updateSetting } = useAppStore();
@@ -79,25 +81,24 @@ export function MapScreen() {
         {countryAreas.flatMap((area) => renderCountryArea(area, maxCountryWeight))}
         {cityPoints.flatMap((point) => renderCityPoint(point, maxCityWeight))}
       </MapView>
-      <View pointerEvents="box-none" style={[styles.headerWrap, { top: insets.top + 14 }]}>
+      <View pointerEvents="box-none" style={[styles.headerWrap, { top: insets.top + dashboardHeaderTopSpacing }]}>
         <View className="flex-row items-center justify-between gap-3">
           <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
             Footprint
           </Text>
-          <HeaderGlassButton
+          <NativeGlassButton
             accessibilityLabel="Change residency year"
-            active={isYearSelectorOpen}
-            palette={palette}
+            color={palette.foreground}
+            fontSize={15}
+            fontWeight="semibold"
+            shape="capsule"
             style={styles.yearHeaderButton}
+            title={yearLabel}
             onPress={() => setIsYearSelectorOpen(true)}
-          >
-            <Text className="text-lg font-bold" style={{ color: palette.foreground }}>
-              {yearLabel}
-            </Text>
-          </HeaderGlassButton>
+          />
         </View>
       </View>
-      <View pointerEvents="box-none" style={[styles.summaryWrap, { top: insets.top + 74 }]}>
+      <View pointerEvents="box-none" style={[styles.summaryWrap, { top: insets.top + dashboardHeaderTopSpacing + 60 }]}>
         <Card className="gap-1" style={[styles.summaryCard, { backgroundColor: palette.card, borderColor: palette.border, shadowColor: palette.shadow }]}>
           <Text variant="subtitle" style={{ color: palette.foreground }}>Country Footprint</Text>
           <Text variant="muted">
@@ -106,17 +107,27 @@ export function MapScreen() {
           {latest ? <Text variant="caption">Latest day {formatRelativeTime(latest.timestamp)}</Text> : null}
         </Card>
       </View>
-      <View style={[styles.zoomControls, { top: insets.top + 164 }]}>
-        <HeaderGlassButton accessibilityLabel="Zoom in" palette={palette} style={styles.zoomButton} onPress={() => zoom(0.55)}>
-          <Text className="text-2xl font-semibold" style={{ color: palette.foreground, lineHeight: 28 }}>
-            +
-          </Text>
-        </HeaderGlassButton>
-        <HeaderGlassButton accessibilityLabel="Zoom out" palette={palette} style={styles.zoomButton} onPress={() => zoom(1.8)}>
-          <Text className="text-2xl font-semibold" style={{ color: palette.foreground, lineHeight: 28 }}>
-            -
-          </Text>
-        </HeaderGlassButton>
+      <View style={[styles.zoomControls, { top: insets.top + dashboardHeaderTopSpacing + 150 }]}>
+        <NativeGlassButton
+          accessibilityLabel="Zoom in"
+          color={palette.foreground}
+          fontSize={22}
+          fontWeight="semibold"
+          shape="roundedRectangle"
+          style={styles.zoomButton}
+          systemImage="plus"
+          onPress={() => zoom(0.55)}
+        />
+        <NativeGlassButton
+          accessibilityLabel="Zoom out"
+          color={palette.foreground}
+          fontSize={22}
+          fontWeight="semibold"
+          shape="roundedRectangle"
+          style={styles.zoomButton}
+          systemImage="minus"
+          onPress={() => zoom(1.8)}
+        />
       </View>
       <YearSelectorDrawer
         palette={palette}

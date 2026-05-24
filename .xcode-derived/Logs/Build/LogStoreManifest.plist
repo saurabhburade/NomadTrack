@@ -5,6 +5,49 @@
 	<key>logFormatVersion</key>
 	<integer>12</integer>
 	<key>logs</key>
-	<dict/>
+	<dict>
+		<key>AB1D2F6B-947E-4BB0-B156-99099D526440</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>AB1D2F6B-947E-4BB0-B156-99099D526440.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>E</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>1</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>TravelNRITracker project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>TravelNRITracker</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project TravelNRITracker with scheme TravelNRITracker and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>801343464.10473502</real>
+			<key>timeStoppedRecording</key>
+			<real>801343474.05730605</real>
+			<key>title</key>
+			<string>Building project TravelNRITracker with scheme TravelNRITracker and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>AB1D2F6B-947E-4BB0-B156-99099D526440</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

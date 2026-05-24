@@ -192,18 +192,19 @@ export async function uploadBackupToDrive() {
   if (!response.ok) throw await driveError("Drive backup failed", response);
   const result = (await response.json()) as { id: string; name: string; modifiedTime: string };
   const now = new Date().toISOString();
-  const db = await getDb();
-  await db.runAsync(
-    `INSERT INTO backup_metadata (id, backup_version, checksum, last_backup_at, drive_file_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    uuid("backup"),
-    header.backupVersion,
-    header.checksum,
-    result.modifiedTime ?? now,
-    result.id,
-    now,
-    now
-  );
+  await runDbWriteTransaction(async (db) => {
+    await db.runAsync(
+      `INSERT INTO backup_metadata (id, backup_version, checksum, last_backup_at, drive_file_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      uuid("backup"),
+      header.backupVersion,
+      header.checksum,
+      result.modifiedTime ?? now,
+      result.id,
+      now,
+      now
+    );
+  });
   return result;
 }
 
@@ -551,8 +552,27 @@ function escapeDriveQueryValue(value: string) {
 
 async function driveError(prefix: string, response: Response) {
   const body = await response.text();
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     return new GoogleLoginRequiredError(`${prefix} with ${response.status}. Please log in with Google again. Backup won't work unless Google Drive is connected.`);
   }
-  return new Error(`${prefix} with ${response.status}${body ? `: ${body}` : ""}`);
+  return new Error(`${prefix} with ${response.status}${formatDriveErrorBody(body)}`);
+}
+
+function formatDriveErrorBody(body: string) {
+  if (!body) return "";
+
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (!isRecord(parsed) || !isRecord(parsed.error)) return `: ${body}`;
+
+    const message = typeof parsed.error.message === "string" ? parsed.error.message : undefined;
+    const errors = Array.isArray(parsed.error.errors) ? parsed.error.errors : [];
+    const reason = errors
+      .map((entry) => (isRecord(entry) && typeof entry.reason === "string" ? entry.reason : undefined))
+      .find((value): value is string => Boolean(value));
+
+    return `: ${[reason, message].filter(Boolean).join(" - ") || body}`;
+  } catch {
+    return `: ${body}`;
+  }
 }

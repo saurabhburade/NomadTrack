@@ -18,6 +18,7 @@ const worldRegion = {
   longitudeDelta: 360
 };
 const mapAnimationDurationMs = 460;
+const dashboardHeaderTopSpacing = 20;
 
 export function MapScreen() {
   const { mapPoints, trips, settings, summary, refresh, updateSetting } = useAppStore();
@@ -79,7 +80,7 @@ export function MapScreen() {
         {countryAreas.flatMap((area) => renderCountryArea(area, maxCountryWeight))}
         {cityPoints.flatMap((point) => renderCityPoint(point, maxCityWeight))}
       </MapView>
-      <View pointerEvents="box-none" style={[styles.headerWrap, { top: insets.top + 14 }]}>
+      <View pointerEvents="box-none" style={[styles.headerWrap, { top: insets.top + dashboardHeaderTopSpacing }]}>
         <View className="flex-row items-center justify-between gap-3">
           <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
             Footprint
@@ -97,7 +98,7 @@ export function MapScreen() {
           </HeaderGlassButton>
         </View>
       </View>
-      <View pointerEvents="box-none" style={[styles.summaryWrap, { top: insets.top + 74 }]}>
+      <View pointerEvents="box-none" style={[styles.summaryWrap, { top: insets.top + dashboardHeaderTopSpacing + 60 }]}>
         <Card className="gap-1" style={[styles.summaryCard, { backgroundColor: palette.card, borderColor: palette.border, shadowColor: palette.shadow }]}>
           <Text variant="subtitle" style={{ color: palette.foreground }}>Country Footprint</Text>
           <Text variant="muted">
@@ -106,7 +107,7 @@ export function MapScreen() {
           {latest ? <Text variant="caption">Latest day {formatRelativeTime(latest.timestamp)}</Text> : null}
         </Card>
       </View>
-      <View style={[styles.zoomControls, { top: insets.top + 164 }]}>
+      <View style={[styles.zoomControls, { top: insets.top + dashboardHeaderTopSpacing + 150 }]}>
         <HeaderGlassButton accessibilityLabel="Zoom in" palette={palette} style={styles.zoomButton} onPress={() => zoom(0.55)}>
           <Text className="text-2xl font-semibold" style={{ color: palette.foreground, lineHeight: 28 }}>
             +

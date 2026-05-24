@@ -10,6 +10,12 @@ WebBrowser.maybeCompleteAuthSession();
 const tokenKey = "google_drive_access_token";
 const googleDriveScopes = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.file"];
 
+export type GoogleAccountProfile = {
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
 export class GoogleLoginRequiredError extends Error {
   constructor(message = "Please log in with Google. Backup won't work unless Google Drive is connected.") {
     super(message);
@@ -96,6 +102,35 @@ export async function getGoogleAccessToken() {
   } catch (error) {
     console.warn(`[google-auth] Token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
     await clearGoogleAccessToken();
+    return null;
+  }
+}
+
+export async function getGoogleAccountProfile(): Promise<GoogleAccountProfile | null> {
+  const accessToken = await getGoogleAccessToken();
+  if (!accessToken) return null;
+
+  try {
+    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    if (!response.ok) return null;
+
+    const profile = (await response.json()) as {
+      email?: unknown;
+      name?: unknown;
+      picture?: unknown;
+    };
+
+    return {
+      email: hasValue(profile.email) ? profile.email : undefined,
+      name: hasValue(profile.name) ? profile.name : undefined,
+      picture: hasValue(profile.picture) ? profile.picture : undefined
+    };
+  } catch (error) {
+    console.warn(`[google-auth] Account profile fetch failed: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

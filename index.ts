@@ -1,7 +1,7 @@
-import { registerRootComponent } from "expo";
+import "react-native-gesture-handler";
+import "./global.css";
 
 import "./src/services/backup/backgroundBackupTask";
 import "./src/services/tracking/locationTracking";
-import App from "./App";
 
-registerRootComponent(App);
+import "expo-router/entry";

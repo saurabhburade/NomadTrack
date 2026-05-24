@@ -260,6 +260,11 @@ PODS:
     - ExpoModulesCore
   - ExpoFont (55.0.8):
     - ExpoModulesCore
+  - ExpoGlassEffect (0.1.10):
+    - ExpoModulesCore
+  - ExpoHead (6.0.23):
+    - ExpoModulesCore
+    - RNScreens
   - ExpoKeepAwake (15.0.8):
     - ExpoModulesCore
   - ExpoLinking (8.0.12):
@@ -307,6 +312,8 @@ PODS:
   - ExpoSharing (14.0.8):
     - ExpoModulesCore
   - ExpoSQLite (16.0.10):
+    - ExpoModulesCore
+  - ExpoUI (0.2.0-beta.9):
     - ExpoModulesCore
   - ExpoWebBrowser (15.0.11):
     - ExpoModulesCore
@@ -3025,7 +3032,7 @@ DEPENDENCIES:
   - "EXJSONUtils (from `../node_modules/.pnpm/expo-json-utils@0.15.0/node_modules/expo-json-utils/ios`)"
   - "EXManifests (from `../node_modules/.pnpm/expo-manifests@1.0.11_expo@54.0.34/node_modules/expo-manifests/ios`)"
   - "EXNotifications (from `../node_modules/.pnpm/expo-notifications@0.32.17_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-n_dcd1f84584ce087ad207709a1d57228c/node_modules/expo-notifications/ios`)"
-  - "Expo (from `../node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_reac_8ebd62ae5d4761b1ef1f7091b3608952/node_modules/expo`)"
+  - "Expo (from `../node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_expo_9f4390d99fc8310b49b173b56920f9d3/node_modules/expo`)"
   - "expo-dev-client (from `../node_modules/.pnpm/expo-dev-client@6.0.21_expo@54.0.34/node_modules/expo-dev-client/ios`)"
   - "expo-dev-launcher (from `../node_modules/.pnpm/expo-dev-launcher@6.0.21_expo@54.0.34/node_modules/expo-dev-launcher`)"
   - "expo-dev-menu (from `../node_modules/.pnpm/expo-dev-menu@7.0.19_expo@54.0.34/node_modules/expo-dev-menu`)"
@@ -3036,6 +3043,8 @@ DEPENDENCIES:
   - "ExpoCrypto (from `../node_modules/.pnpm/expo-crypto@15.0.9_expo@54.0.34/node_modules/expo-crypto/ios`)"
   - "ExpoFileSystem (from `../node_modules/.pnpm/expo-file-system@19.0.22_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_ff6f7e1c9e8f1ae612cfaacdc8de68d3/node_modules/expo-file-system/ios`)"
   - "ExpoFont (from `../node_modules/.pnpm/expo-font@55.0.8_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+metr_39e0f9bd5786a024dd776d1ef2051bb3/node_modules/expo-font/ios`)"
+  - "ExpoGlassEffect (from `../node_modules/.pnpm/expo-glass-effect@0.1.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_fe12075906becefe30c08b2eac1020c1/node_modules/expo-glass-effect/ios`)"
+  - "ExpoHead (from `../node_modules/.pnpm/expo-router@6.0.23_80b3e52015d931481752be2f822c6ef6/node_modules/expo-router/ios`)"
   - "ExpoKeepAwake (from `../node_modules/.pnpm/expo-keep-awake@15.0.8_expo@54.0.34_react@19.1.0/node_modules/expo-keep-awake/ios`)"
   - "ExpoLinking (from `../node_modules/.pnpm/expo-linking@8.0.12_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_391cf17b1b9b39cc90b4e8d52c44c66c/node_modules/expo-linking/ios`)"
   - "ExpoLocation (from `../node_modules/.pnpm/expo-location@19.0.8_expo@54.0.34/node_modules/expo-location/ios`)"
@@ -3046,6 +3055,7 @@ DEPENDENCIES:
   - "ExpoSecureStore (from `../node_modules/.pnpm/expo-secure-store@15.0.8_expo@54.0.34/node_modules/expo-secure-store/ios`)"
   - "ExpoSharing (from `../node_modules/.pnpm/expo-sharing@14.0.8_expo@54.0.34/node_modules/expo-sharing/ios`)"
   - "ExpoSQLite (from `../node_modules/.pnpm/expo-sqlite@16.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_e1f16c1155a99d599ec4bd782f6e0aa4/node_modules/expo-sqlite/ios`)"
+  - "ExpoUI (from `../node_modules/.pnpm/@expo+ui@0.2.0-beta.9_patch_hash=5418b3b823cfb2a2bc4e4ba54ce923239d15fd1785990b71469b2c_846e5f3052fa953954968d6ea14d2da4/node_modules/@expo/ui/ios`)"
   - "ExpoWebBrowser (from `../node_modules/.pnpm/expo-web-browser@15.0.11_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_a60647c17a5f52a68a4445dab53385c9/node_modules/expo-web-browser/ios`)"
   - "EXTaskManager (from `../node_modules/.pnpm/expo-task-manager@14.0.9_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_f91d3bf50cb5b701cb8972793ef53759/node_modules/expo-task-manager/ios`)"
   - "EXUpdatesInterface (from `../node_modules/.pnpm/expo-updates-interface@2.0.0_expo@54.0.34/node_modules/expo-updates-interface/ios`)"
@@ -3152,7 +3162,7 @@ EXTERNAL SOURCES:
   EXNotifications:
     :path: "../node_modules/.pnpm/expo-notifications@0.32.17_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-n_dcd1f84584ce087ad207709a1d57228c/node_modules/expo-notifications/ios"
   Expo:
-    :path: "../node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_reac_8ebd62ae5d4761b1ef1f7091b3608952/node_modules/expo"
+    :path: "../node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+dom-webview@55.0.6_@expo+metro-runtime@6.1.2_expo_9f4390d99fc8310b49b173b56920f9d3/node_modules/expo"
   expo-dev-client:
     :path: "../node_modules/.pnpm/expo-dev-client@6.0.21_expo@54.0.34/node_modules/expo-dev-client/ios"
   expo-dev-launcher:
@@ -3173,6 +3183,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-file-system@19.0.22_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_ff6f7e1c9e8f1ae612cfaacdc8de68d3/node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../node_modules/.pnpm/expo-font@55.0.8_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+metr_39e0f9bd5786a024dd776d1ef2051bb3/node_modules/expo-font/ios"
+  ExpoGlassEffect:
+    :path: "../node_modules/.pnpm/expo-glass-effect@0.1.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_fe12075906becefe30c08b2eac1020c1/node_modules/expo-glass-effect/ios"
+  ExpoHead:
+    :path: "../node_modules/.pnpm/expo-router@6.0.23_80b3e52015d931481752be2f822c6ef6/node_modules/expo-router/ios"
   ExpoKeepAwake:
     :path: "../node_modules/.pnpm/expo-keep-awake@15.0.8_expo@54.0.34_react@19.1.0/node_modules/expo-keep-awake/ios"
   ExpoLinking:
@@ -3193,6 +3207,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-sharing@14.0.8_expo@54.0.34/node_modules/expo-sharing/ios"
   ExpoSQLite:
     :path: "../node_modules/.pnpm/expo-sqlite@16.0.10_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-native+m_e1f16c1155a99d599ec4bd782f6e0aa4/node_modules/expo-sqlite/ios"
+  ExpoUI:
+    :path: "../node_modules/.pnpm/@expo+ui@0.2.0-beta.9_patch_hash=5418b3b823cfb2a2bc4e4ba54ce923239d15fd1785990b71469b2c_846e5f3052fa953954968d6ea14d2da4/node_modules/@expo/ui/ios"
   ExpoWebBrowser:
     :path: "../node_modules/.pnpm/expo-web-browser@15.0.11_expo@54.0.34_react-native@0.81.5_@babel+core@7.29.0_@react-nat_a60647c17a5f52a68a4445dab53385c9/node_modules/expo-web-browser/ios"
   EXTaskManager:
@@ -3376,6 +3392,8 @@ SPEC CHECKSUMS:
   ExpoCrypto: e2a2c4c748aac8485e5675f027b7901f511d43ff
   ExpoFileSystem: ad991457efaa14253723f1dda997eac6024c700d
   ExpoFont: a7e34a75bdfb703fa07a0e87807f836236608c76
+  ExpoGlassEffect: 2fd78765fb4633fc2575779a521ca6adb3488881
+  ExpoHead: 7e19b2272edf492262acf8afb391a295198a6b23
   ExpoKeepAwake: 55f75eca6499bb9e4231ebad6f3e9cb8f99c0296
   ExpoLinking: 2ef632ad5013e3f1568fae9408d56ab9af5efc55
   ExpoLocation: d5b61cb4970fa982e39ca94246a206a0c3b812ca
@@ -3386,6 +3404,7 @@ SPEC CHECKSUMS:
   ExpoSecureStore: d32f751874a2ceb5aaeebeb3578e165c1ba2b24a
   ExpoSharing: 0d983394ed4a80334bab5a0d5384f75710feb7e8
   ExpoSQLite: 7eedbe476870a5f18d6b89c817c4ac6f299830ad
+  ExpoUI: b75e5ed95b5966b273f1305346f4b5fd911360be
   ExpoWebBrowser: 970dd4c64c29c955c3af664c8058ba768a4c9187
   EXTaskManager: 6f1a66e4c8cc6df6e24c3d90928704bc3013eae5
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734

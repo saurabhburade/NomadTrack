@@ -12,6 +12,7 @@ import { MapScreen } from "../screens/MapScreen";
 import { TripsScreen } from "../screens/TripsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { YearOverviewScreen } from "../screens/YearOverviewScreen";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
 import { useAppStore } from "../store/appStore";
 
@@ -197,27 +198,20 @@ function LiquidGlassTabBar({ state, descriptors, navigation, isDark, onRouteChan
       style={[
         styles.tabBar,
         {
-          backgroundColor: isDark ? palette.backgroundSecondary : "rgba(255,255,255,0.36)",
-          borderColor: isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.08)",
+          backgroundColor: isDark ? "rgba(18,18,20,0.08)" : "rgba(255,255,255,0.08)",
+          borderColor: isDark ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.48)",
           bottom: Math.max(insets.bottom, 10)
         }
       ]}
     >
-      {!isDark ? (
-        <BlurView
-          intensity={96}
-          pointerEvents="none"
-          tint="light"
-          style={StyleSheet.absoluteFill}
-        />
-      ) : null}
+      <LiquidGlassLayer colorScheme={isDark ? "dark" : "light"} glassStyle="regular" intensity={98} tint={isDark ? "systemChromeMaterialDark" : "systemChromeMaterialLight"} />
       <Animated.View
         pointerEvents="none"
         style={[
           styles.liquidIndicator,
           {
-            backgroundColor: isDark ? palette.backgroundTertiary : "rgba(0,0,0,0.08)",
-            borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+            backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.28)",
+            borderColor: isDark ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.58)",
             shadowColor: palette.shadow
           },
           indicatorStyle
