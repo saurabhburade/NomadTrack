@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { ChevronRight } from "lucide-react-native";
 import { Button } from "../components/ui/button";
 import { Text } from "../components/ui/text";
+import { BackupProgressDialog } from "../components/backup/BackupProgressDialog";
 import { NomadTrackLogo } from "../components/brand/NomadTrackLogo";
 import { hasLocalTravelData } from "../db/database";
 import { iconStrokeWidth } from "../lib/colors";
-import { listDriveBackups, restoreLatestDriveBackup } from "../services/backup/driveBackup";
+import { listDriveBackups, restoreLatestDriveBackup, type BackupProgress } from "../services/backup/driveBackup";
 import { getGoogleDriveAuthSetup, storeGoogleTokenResponse, useGoogleDriveAuthRequest } from "../services/auth/googleAuth";
 import { useAppStore } from "../store/appStore";
 
@@ -16,6 +17,8 @@ export function OnboardingScreen() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [restoreState, setRestoreState] = useState<"idle" | "checking" | "available" | "restoring">("idle");
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [backupProgress, setBackupProgress] = useState<BackupProgress | null>(null);
+  const primaryButtonBusy = isSigningIn || restoreState === "checking" || restoreState === "restoring";
   const opacity = useRef(new Animated.Value(0)).current;
   const updateSetting = useAppStore((state) => state.updateSetting);
   const refresh = useAppStore((state) => state.refresh);
@@ -86,11 +89,12 @@ export function OnboardingScreen() {
     setRestoreMessage("Restoring your Google Drive backup...");
 
     try {
-      const result = await restoreLatestDriveBackup();
+      const result = await restoreLatestDriveBackup({ onProgress: setBackupProgress });
       await setSelectedDate(result.displayDate);
       await finishOnboarding();
     } catch (error) {
       setRestoreState("available");
+      setBackupProgress(null);
       Alert.alert("Restore failed", error instanceof Error ? error.message : "Could not restore the Google Drive backup.");
     }
   }
@@ -141,12 +145,17 @@ export function OnboardingScreen() {
 
               {restoreState !== "available" ? (
                 <Button
-                  className="h-16 w-full justify-between rounded-full border-[#0a0a0a] bg-[#0a0a0a] px-7"
-                  disabled={isSigningIn || restoreState === "checking" || restoreState === "restoring"}
+                  className="h-16 w-full rounded-full border-[#0a0a0a] bg-[#0a0a0a] px-7"
+                  contentStyle={styles.primaryButtonContent}
+                  disabled={primaryButtonBusy}
                   onPress={handleGetStarted}
                 >
                   <Text className="text-sm font-bold text-white">{getPrimaryButtonLabel(isSigningIn, restoreState)}</Text>
-                  <ChevronRight size={25} color="#fff" strokeWidth={iconStrokeWidth} />
+                  {primaryButtonBusy ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <ChevronRight size={25} color="#fff" strokeWidth={iconStrokeWidth} />
+                  )}
                 </Button>
               ) : null}
               {restoreState === "available" ? (
@@ -155,7 +164,7 @@ export function OnboardingScreen() {
                   <Button className="h-14 rounded-full border-[#0a0a0a] bg-[#0a0a0a]" onPress={restoreBackupAndContinue}>
                     <Text className="text-sm font-bold text-white">Restore Backup</Text>
                   </Button>
-                  <Button className="h-12 rounded-full border-[#d4d4d4] bg-white" variant="outline" onPress={skipRestoreAndContinue}>
+                  <Button className="h-12 rounded-full border-[#d4d4d4] bg-white" glass={false} variant="outline" onPress={skipRestoreAndContinue}>
                     <Text className="text-sm font-bold text-[#0a0a0a]">Continue Without Restore</Text>
                   </Button>
                 </View>
@@ -166,9 +175,31 @@ export function OnboardingScreen() {
           </View>
         </SafeAreaView>
       </Animated.View>
+      <BackupProgressDialog
+        palette={onboardingBackupProgressPalette}
+        progress={backupProgress}
+        visible={Boolean(backupProgress)}
+      />
     </View>
   );
 }
+
+const onboardingBackupProgressPalette = {
+  backdrop: "rgba(0,0,0,0.28)",
+  border: "rgba(0,0,0,0.08)",
+  foreground: "#0a0a0a",
+  muted: "#6b6b6b",
+  surface: "#ffffff",
+  tint: "#0a0a0a",
+  track: "rgba(0,0,0,0.12)"
+};
+
+const styles = StyleSheet.create({
+  primaryButtonContent: {
+    justifyContent: "space-between",
+    width: "100%"
+  }
+});
 
 function getPrimaryButtonLabel(isSigningIn: boolean, restoreState: "idle" | "checking" | "available" | "restoring") {
   if (restoreState === "checking") return "Checking Backup...";

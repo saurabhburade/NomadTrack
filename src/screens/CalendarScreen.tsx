@@ -27,6 +27,7 @@ const CALENDAR_DAY_TAP_SLOP = 14;
 const CALENDAR_DAY_TAP_MAX_DURATION_MS = 700;
 const MANUAL_ENTRY_MIN_DATE = "1900-01-01";
 const MANUAL_ENTRY_MAX_DATE = "2100-12-31";
+const manualEntryTripNotes = new Set(["Manual history entry", "Manual day correction"]);
 type CountryOption = { code: string; name: string };
 type CalendarDayTouchStart = {
   iso: string;
@@ -316,39 +317,51 @@ export function CalendarScreen() {
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const { monthRecords, yearRecords, selectedDate, setSelectedDate, settings, addManualEntry, clearManualEntryRange, updateDayEntry, deleteDayEntry } = useAppStore();
+  const { monthRecords, monthRecordsMonth, yearRecords, selectedDate, setSelectedDate, settings, trips, addManualEntry, clearManualEntryRange, updateDayEntry, deleteDayEntry } = useAppStore();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getPalette(isDark);
   const calendarWidth = Math.max(280, windowWidth - 36);
   const [month, setMonth] = useState(() => startOfMonth(parseISO(selectedDate)));
-  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [isManualEntrySaving, setIsManualEntrySaving] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [openManualEntryAfterMenuClose, setOpenManualEntryAfterMenuClose] = useState(false);
   const todayIso = new Date().toISOString().slice(0, 10);
   const selectedDateInMonth = isSameMonth(parseISO(selectedDate), month) ? selectedDate : todayIso;
-  const recordsByDate = useMemo(() => new Map(monthRecords.map((record) => [record.date, record])), [monthRecords]);
-  const yearRecordsByDate = useMemo(() => new Map(yearRecords.map((record) => [record.date, record])), [yearRecords]);
+  const calendarMonthKey = useMemo(() => format(month, "yyyy-MM"), [month]);
+  const monthRecordCacheRef = useRef(new Map<string, DayRecordPreview[]>());
+  const visibleMonthRecords = useMemo(() => {
+    if (monthRecordsMonth === calendarMonthKey) return monthRecords;
+    return monthRecordCacheRef.current.get(calendarMonthKey) ?? [];
+  }, [calendarMonthKey, monthRecords, monthRecordsMonth]);
+  const recordsByDate = useMemo(() => new Map(visibleMonthRecords.map((record) => [record.date, record])), [visibleMonthRecords]);
+  const manualEntryExistingRecords = useMemo(() => {
+    const records = new Map<string, DayRecordPreview>();
+    for (const record of buildManualEntryRecordsFromTrips(trips)) records.set(record.date, record);
+    for (const record of yearRecords) records.set(record.date, record);
+    for (const record of visibleMonthRecords) records.set(record.date, record);
+    return [...records.values()].sort((first, second) => first.date.localeCompare(second.date));
+  }, [trips, visibleMonthRecords, yearRecords]);
+  const yearRecordsByDate = useMemo(() => new Map(manualEntryExistingRecords.map((record) => [record.date, record])), [manualEntryExistingRecords]);
   const nativeManualEntryRecords = useMemo(
     () =>
-      yearRecords
+      manualEntryExistingRecords
         .filter((record) => record.primary_country_code)
         .map((record) => ({
           date: record.date,
           countryCode: record.primary_country_code!
         })),
-    [yearRecords]
+    [manualEntryExistingRecords]
   );
   const nativeCalendarDayRecords = useMemo(
     () =>
-      monthRecords.map((record) => ({
+      visibleMonthRecords.map((record) => ({
         date: record.date,
         countryCode: record.primary_country_code ?? ""
       })),
-    [monthRecords]
+    [visibleMonthRecords]
   );
-  const monthSummary = useMemo(() => buildMonthSummary(monthRecords, month), [monthRecords, month]);
+  const monthSummary = useMemo(() => buildMonthSummary(visibleMonthRecords, month), [visibleMonthRecords, month]);
   const nativeMonthSummary = useMemo(
     () => ({
       abroadDays: monthSummary.abroadDays,
@@ -364,11 +377,14 @@ export function CalendarScreen() {
   );
   const editingRecord = editingDate ? recordsByDate.get(editingDate) : undefined;
   const calendarScrollRange = useMemo(() => getCalendarScrollRange(month), [month]);
-  const calendarMonthKey = useMemo(() => format(month, "yyyy-MM"), [month]);
-  const calendarRenderKey = useMemo(() => `${calendarMonthKey}:${selectedDate}:${monthRecords.map((record) => `${record.date}:${record.primary_country_code ?? ""}`).join(",")}`, [calendarMonthKey, monthRecords, selectedDate]);
+  const calendarRenderKey = useMemo(() => `${calendarMonthKey}:${selectedDate}:${visibleMonthRecords.map((record) => `${record.date}:${record.primary_country_code ?? ""}`).join(",")}`, [calendarMonthKey, visibleMonthRecords, selectedDate]);
   const programmaticMonthIsoRef = useRef<string | null>(null);
   const calendarDayTouchStartRef = useRef<CalendarDayTouchStart | null>(null);
   const lastDayOpenRef = useRef<{ iso: string; openedAt: number } | null>(null);
+
+  useEffect(() => {
+    monthRecordCacheRef.current.set(monthRecordsMonth, monthRecords);
+  }, [monthRecords, monthRecordsMonth]);
 
   const setVisibleMonth = useCallback((nextMonth: Date) => {
     const start = startOfMonth(nextMonth);
@@ -503,21 +519,9 @@ export function CalendarScreen() {
     [month, palette.accent, palette.foreground, recordsByDate, selectDay, selectedDateInMonth, todayIso]
   );
 
-  function openManualEntry() {
-    setOpenManualEntryAfterMenuClose(true);
-    setIsAddMenuOpen(false);
-  }
-
-  const handleAddMenuClose = useCallback(() => {
-    setIsAddMenuOpen(false);
-    setOpenManualEntryAfterMenuClose(false);
-  }, []);
-
-  const handleAddMenuClosed = useCallback(() => {
-    if (!openManualEntryAfterMenuClose) return;
-    setOpenManualEntryAfterMenuClose(false);
+  const openManualEntry = useCallback(() => {
     setIsManualEntryOpen(true);
-  }, [openManualEntryAfterMenuClose]);
+  }, []);
 
   async function insertManualEntry(entry: ManualTravelEntry) {
     await addManualEntry(entry);
@@ -585,10 +589,7 @@ export function CalendarScreen() {
               foregroundColor={palette.foreground}
               label={format(month, "MMMM yyyy")}
               style={styles.nativeCalendarToolbar}
-              onManualEntry={() => {
-                setOpenManualEntryAfterMenuClose(false);
-                setIsManualEntryOpen(true);
-              }}
+              onManualEntry={openManualEntry}
               onMonthPress={() => setIsMonthPickerOpen(true)}
               onNextMonth={() => void shiftMonth(1)}
               onPreviousMonth={() => void shiftMonth(-1)}
@@ -599,7 +600,7 @@ export function CalendarScreen() {
                 <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={[styles.title, { color: palette.foreground }]}>
                   History
                 </Text>
-                <Pressable accessibilityRole="button" accessibilityLabel="Add travel entry" style={({ pressed }) => [styles.addButton, { shadowColor: palette.addShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => setIsAddMenuOpen(true)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Add travel entry" style={({ pressed }) => [styles.addButton, { shadowColor: palette.addShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={openManualEntry}>
                   <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
                   <Plus size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
@@ -704,13 +705,6 @@ export function CalendarScreen() {
         </View>
       </ScrollView>
 
-      <CalendarAddMenu
-        palette={palette}
-        visible={isAddMenuOpen}
-        onClose={handleAddMenuClose}
-        onClosed={handleAddMenuClosed}
-        onManualEntry={openManualEntry}
-      />
       {isNativeMonthYearSheetAvailable ? (
         <NativeMonthYearSheet
           monthIndex={month.getMonth()}
@@ -769,15 +763,23 @@ export function CalendarScreen() {
             selectedForeground: palette.selectedForeground,
             weekday: palette.weekday
           }}
+          isSaving={isManualEntrySaving}
           visible={isManualEntryOpen}
-          onClose={() => setIsManualEntryOpen(false)}
+          onClose={() => {
+            if (isManualEntrySaving) return;
+            setIsManualEntryOpen(false);
+          }}
           onConfirm={(entry) => {
             void (async () => {
+              if (isManualEntrySaving) return;
+              setIsManualEntrySaving(true);
               try {
                 await insertManualEntry(entry);
                 setIsManualEntryOpen(false);
               } catch (error) {
                 Alert.alert("Insert failed", error instanceof Error ? error.message : "Could not insert manual entry.");
+              } finally {
+                setIsManualEntrySaving(false);
               }
             })();
           }}
@@ -1503,9 +1505,9 @@ function ManualEntryDrawer({
       </View>
 
       <View style={styles.drawerActions}>
-        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.errorFill} borderColor={palette.errorBorder} foregroundColor={palette.errorText} systemImage="trash" title={isClearing ? "Clearing" : "Clear"} style={styles.nativeActionButton} onPress={requestClearRange} />
+        <DrawerActionButton disabled={isSaving || isClearing} loading={isClearing} backgroundColor={palette.errorFill} borderColor={palette.errorBorder} foregroundColor={palette.errorText} systemImage="trash" title={isClearing ? "Clearing" : "Clear"} style={styles.nativeActionButton} onPress={requestClearRange} />
         <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Inserting" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
+        <DrawerActionButton disabled={isSaving || isClearing} loading={isSaving} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Saving" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
       </View>
     </ScrollView>
   );
@@ -1999,15 +2001,11 @@ function CalendarDateRangeFields({
                   />
                 ) : null}
                 <View style={[styles.rangeDayCircle, { backgroundColor: isSelected ? palette.selectedFill : "transparent", borderColor: isSelected ? palette.selectedBorder : "transparent", opacity: dayOpacity }]}>
-                  <Text className="text-xs font-bold" style={{ color: isSelected ? palette.selectedForeground : palette.foreground }}>
+                  <Text style={[styles.rangeDayNumber, existingCountryCode ? styles.rangeDayNumberWithFlag : null, { color: isSelected ? palette.selectedForeground : palette.foreground }]}>
                     {cell.day}
                   </Text>
+                  {existingCountryCode ? <Text style={styles.rangeDayCircleFlag}>{flagForCountry(existingCountryCode)}</Text> : null}
                 </View>
-                {existingCountryCode ? (
-                  <Text className="text-xs" style={[styles.rangeDayFlag, { opacity: dayOpacity }]}>
-                    {flagForCountry(existingCountryCode)}
-                  </Text>
-                ) : null}
               </Pressable>
             );
           })}
@@ -2034,6 +2032,32 @@ function buildMonthCells(month: Date) {
   }
 
   return cells;
+}
+
+function buildManualEntryRecordsFromTrips(trips: ReturnType<typeof useAppStore.getState>["trips"]): DayRecordPreview[] {
+  const records: DayRecordPreview[] = [];
+
+  for (const trip of trips) {
+    if (!trip.notes || !manualEntryTripNotes.has(trip.notes)) continue;
+
+    let cursor = parseISO(trip.startDate);
+    const endDate = parseISO(trip.endDate);
+
+    while (cursor <= endDate) {
+      const date = format(cursor, "yyyy-MM-dd");
+      records.push({
+        date,
+        primary_country_code: trip.countryCode,
+        primary_country_name: trip.countryName,
+        is_travel_day: 0,
+        is_pending_validation: 0,
+        is_manual_override: 1
+      });
+      cursor = addDays(cursor, 1);
+    }
+  }
+
+  return records;
 }
 
 function getDefaultManualEndDate(startDate: string) {
@@ -2077,93 +2101,6 @@ function RangeBoundaryButton({
         </Text>
       </View>
     </Pressable>
-  );
-}
-
-function CalendarAddMenu({
-  palette,
-  visible,
-  onClose,
-  onClosed,
-  onManualEntry
-}: {
-  palette: ReturnType<typeof getPalette>;
-  visible: boolean;
-  onClose: () => void;
-  onClosed: () => void;
-  onManualEntry: () => void;
-}) {
-  const [isRendered, setIsRendered] = useState(visible);
-  const progress = useSharedValue(visible ? 1 : 0);
-
-  useEffect(() => {
-    if (visible) {
-      setIsRendered(true);
-      progress.value = withTiming(1, {
-        duration: 210,
-        easing: ReanimatedEasing.out(ReanimatedEasing.cubic)
-      });
-      return;
-    }
-
-    progress.value = withTiming(
-      0,
-      {
-        duration: 150,
-        easing: ReanimatedEasing.in(ReanimatedEasing.quad)
-      },
-      (finished) => {
-        if (finished) {
-          runOnJS(setIsRendered)(false);
-          runOnJS(onClosed)();
-        }
-      }
-    );
-  }, [onClosed, progress, visible]);
-
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [0, 1])
-  }));
-
-  const menuStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      { translateY: interpolate(progress.value, [0, 1], [-10, 0]) },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) }
-    ]
-  }));
-
-  if (!isRendered) return null;
-
-  return (
-    <Modal visible={isRendered} transparent animationType="none" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.noPointerEvents, backdropStyle]}>
-          <GlassBlurLayer tint={palette.blurTint} intensity={32} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.menuBackdrop }]} />
-        </Animated.View>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          style={[
-            styles.addMenu,
-            {
-              backgroundColor: palette.addMenuFill,
-              borderColor: palette.addMenuBorder,
-              shadowColor: palette.glassShadow
-            },
-            menuStyle
-          ]}
-        >
-          <GlassBlurLayer tint={palette.blurTint} intensity={72} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
-          <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.addMenuFill }]} />
-          <View style={[styles.addMenuHighlight, styles.noPointerEvents, { backgroundColor: palette.addMenuHighlight }]} />
-          <View style={[styles.quickMenuRim, styles.noPointerEvents, { borderColor: palette.addMenuRim }]} />
-          <View style={styles.addMenuContent}>
-            <AddMenuAction label="Manual Entry" palette={palette} onPress={onManualEntry} />
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
   );
 }
 
@@ -2212,17 +2149,6 @@ function useKeyboardInset(safeAreaBottom: number) {
   }, [safeAreaBottom]);
 
   return keyboardInset;
-}
-
-function AddMenuAction({ label, onPress, palette }: { label: string; onPress: () => void; palette: ReturnType<typeof getPalette> }) {
-  return (
-    <Pressable accessibilityRole="menuitem" accessibilityLabel={label} style={styles.addMenuAction} onPress={onPress}>
-      <PencilLine size={28} color={palette.foreground} strokeWidth={iconStrokeWidth} />
-      <Text className="flex-1 text-lg" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
 }
 
 function buildCountryOptions(): CountryOption[] {
@@ -2353,12 +2279,7 @@ function getPalette(isDark: boolean) {
     actionSecondaryBorder: isDark ? "rgba(255,255,255,0.24)" : "rgba(0,0,0,0.14)",
     actionSecondaryFill: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
     addButton: isDark ? neutral.backgroundSecondary : "rgba(255,255,255,0.78)",
-    addBorder: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
     addShadow: neutral.shadow,
-    addMenuBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.62)",
-    addMenuFill: isDark ? "rgba(30,30,32,0.88)" : "rgba(255,255,255,0.62)",
-    addMenuHighlight: isDark ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.58)",
-    addMenuRim: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.46)",
     basicBlurTint: (isDark ? "dark" : "light") as "dark" | "light",
     blurTint: (isDark ? "systemThinMaterialDark" : "systemThinMaterialLight") as "systemThinMaterialDark" | "systemThinMaterialLight",
     chipFill: isDark ? neutral.backgroundTertiary : "rgba(0,0,0,0.04)",
@@ -2376,7 +2297,6 @@ function getPalette(isDark: boolean) {
     glassShadow: neutral.shadow,
     inputBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.48)",
     inputFill: isDark ? "rgba(32,32,34,0.5)" : "rgba(255,255,255,0.52)",
-    menuBackdrop: isDark ? "rgba(0,0,0,0.54)" : "rgba(0,0,0,0.14)",
     menuGlassFill: isDark ? "rgba(28,28,30,0.96)" : "rgba(255,255,255,0.32)",
     monthLabelBorder: isDark ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.82)",
     monthLabelBottomGlow: isDark ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.44)",
@@ -2427,37 +2347,6 @@ const styles = StyleSheet.create({
   },
   noPointerEvents: {
     pointerEvents: "none"
-  },
-  addMenu: {
-    borderCurve: "continuous",
-    borderRadius: 31,
-    borderWidth: 1,
-    overflow: "hidden",
-    position: "absolute",
-    right: 16,
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.36,
-    shadowRadius: 38,
-    top: 88,
-    width: 282
-  },
-  addMenuHighlight: {
-    height: "48%",
-    left: 1,
-    opacity: 0.46,
-    position: "absolute",
-    right: 1,
-    top: 1
-  },
-  addMenuContent: {
-    paddingVertical: 8
-  },
-  addMenuAction: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 20,
-    height: 64,
-    paddingHorizontal: 28
   },
   countryChips: {
     flexDirection: "row",
@@ -2626,13 +2515,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 30,
     justifyContent: "center",
+    overflow: "hidden",
     width: 30
   },
-  rangeDayFlag: {
-    bottom: 0,
-    fontSize: 11,
-    lineHeight: 12,
-    position: "absolute"
+  rangeDayNumber: {
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 14
+  },
+  rangeDayNumberWithFlag: {
+    fontSize: 10,
+    lineHeight: 11,
+    marginTop: 1
+  },
+  rangeDayCircleFlag: {
+    fontSize: 10,
+    lineHeight: 11,
+    marginTop: -1
   },
   drawerActions: {
     alignSelf: "stretch",
@@ -2826,12 +2725,6 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 50,
     justifyContent: "center"
-  },
-  quickMenuRim: {
-    ...StyleSheet.absoluteFillObject,
-    borderCurve: "continuous",
-    borderRadius: 31,
-    borderWidth: 1
   },
   secondaryAction: {
     alignItems: "center",

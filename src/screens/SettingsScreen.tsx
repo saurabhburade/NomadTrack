@@ -21,6 +21,7 @@ import {
   XCircle
 } from "lucide-react-native";
 import { Text } from "../components/ui/text";
+import { BackupProgressDialog, type BackupProgressDialogPalette } from "../components/backup/BackupProgressDialog";
 import { NativeDivider } from "../components/native/NativeDivider";
 import { NativeProgress } from "../components/native/NativeProgress";
 import { NativeSettingsScreen, isNativeSettingsScreenAvailable, type SettingsNativeAction } from "../components/native/NativeSettingsScreen";
@@ -38,7 +39,7 @@ import {
   storeGoogleTokenResponse,
   useGoogleDriveAuthRequest
 } from "../services/auth/googleAuth";
-import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile } from "../services/backup/driveBackup";
+import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile, type BackupProgress } from "../services/backup/driveBackup";
 import { exportLocationCsv } from "../services/export/csvExport";
 import { stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
@@ -79,6 +80,7 @@ export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const [googleAuthRequest, response, promptAsync] = useGoogleDriveAuthRequest();
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [backupProgress, setBackupProgress] = useState<BackupProgress | null>(null);
   const [isBackupBusy, setIsBackupBusy] = useState(false);
   const [isResetBusy, setIsResetBusy] = useState(false);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnectionState>(defaultGoogleConnection);
@@ -189,13 +191,28 @@ export function SettingsScreen() {
       if (!canUseBackup) return;
 
       setBackupStatus({ tone: "info", message: "Uploading backup to Google Drive..." });
-      const result = await uploadBackupToDrive();
+      const result = await uploadBackupToDrive({ onProgress: setBackupProgress });
       setBackupStatus({ tone: "success", message: `Backup successful: ${result.name} updated ${formatBackupTime(result.modifiedTime)}.` });
       await refreshGoogleConnectionState();
       await refresh();
     } catch (error) {
       handleBackupError(error, "Backup failed.");
     } finally {
+      setBackupProgress(null);
+      setIsBackupBusy(false);
+    }
+  }
+
+  async function saveLocalBackup() {
+    setIsBackupBusy(true);
+    try {
+      setBackupStatus({ tone: "info", message: "Saving local backup file..." });
+      await writeLocalBackupFile({ onProgress: setBackupProgress });
+      setBackupStatus({ tone: "success", message: "Local backup file saved." });
+    } catch (error) {
+      handleBackupError(error, "Could not save local backup.");
+    } finally {
+      setBackupProgress(null);
       setIsBackupBusy(false);
     }
   }
@@ -217,6 +234,7 @@ export function SettingsScreen() {
     } catch (error) {
       handleBackupError(error, "Could not check Drive backups.");
     } finally {
+      setBackupProgress(null);
       setIsBackupBusy(false);
     }
   }
@@ -224,7 +242,7 @@ export function SettingsScreen() {
   function confirmRestoreLatestBackup() {
     Alert.alert(
       "Restore latest backup?",
-      "This will replace data for the backup's year with the latest Google Drive backup. Other years will be left unchanged.",
+      "This will replace local travel history with the latest Google Drive backup. Older year-scoped backups still restore only their saved date range.",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Restore", style: "destructive", onPress: () => void restoreLatestBackup() }
@@ -239,7 +257,8 @@ export function SettingsScreen() {
       if (!canUseBackup) return;
 
       setBackupStatus({ tone: "info", message: "Restoring latest Google Drive backup..." });
-      const result = await restoreLatestDriveBackup();
+      const result = await restoreLatestDriveBackup({ onProgress: setBackupProgress });
+      const backupLabel = result.backup.scope.label;
       const restoredCount = Object.values(result.restoredRows).reduce((sum, count) => sum + count, 0);
       const travelRows =
         result.restoredRows.location_points +
@@ -251,8 +270,8 @@ export function SettingsScreen() {
         tone: travelRows > 0 ? "success" : "error",
         message:
           travelRows > 0
-            ? `Restore complete: ${restoredCount} rows from ${result.file.year ?? result.backup.scope.label} backup updated ${formatBackupTime(result.file.modifiedTime)}.`
-            : `Restore finished, but this backup only contained settings. No travel history was found in the ${result.file.year ?? result.backup.scope.label} backup.`
+            ? `Restore complete: ${restoredCount} rows from ${backupLabel} backup updated ${formatBackupTime(result.file.modifiedTime)}.`
+            : `Restore finished, but this backup only contained settings. No travel history was found in the ${backupLabel} backup.`
       });
       await refreshGoogleConnectionState();
       await setSelectedDate(result.displayDate);
@@ -260,6 +279,7 @@ export function SettingsScreen() {
     } catch (error) {
       handleBackupError(error, "Restore failed.");
     } finally {
+      setBackupProgress(null);
       setIsBackupBusy(false);
     }
   }
@@ -294,11 +314,12 @@ export function SettingsScreen() {
       if (!canUseBackup) return;
 
       setBackupStatus({ tone: "info", message: "Uploading backup before logout..." });
-      await uploadBackupToDrive();
+      await uploadBackupToDrive({ onProgress: setBackupProgress });
       await clearDeviceAndReturnToOnboarding("Backup complete. Local data cleared and Google disconnected.");
     } catch (error) {
       handleBackupError(error, "Backup and logout failed.");
     } finally {
+      setBackupProgress(null);
       setIsBackupBusy(false);
       setIsResetBusy(false);
     }
@@ -343,7 +364,7 @@ export function SettingsScreen() {
         void exportLocationCsv();
         break;
       case "saveLocalBackup":
-        void writeLocalBackupFile();
+        void saveLocalBackup();
         break;
       case "disconnectGoogle":
         void disconnectGoogleDrive();
@@ -382,6 +403,11 @@ export function SettingsScreen() {
           onAutoBackupChange={(value: boolean) => void updateSetting("autoBackup", value)}
           onCloudBackupEnabledChange={(value: boolean) => void updateSetting("cloudBackupEnabled", value)}
           onResidencyConfirm={(year: number, calendarYearMode: boolean) => void applyResidencySettings(year, calendarYearMode)}
+        />
+        <BackupProgressDialog
+          palette={getBackupProgressDialogPalette(palette)}
+          progress={backupProgress}
+          visible={Boolean(backupProgress)}
         />
         <YearSelectorDrawer
           calendarYearMode={draftCalendarYearMode}
@@ -500,7 +526,14 @@ export function SettingsScreen() {
           <SettingsGroup palette={palette}>
             <SettingsRow Icon={Download} detail="Location history CSV" palette={palette} title="Export CSV" onPress={() => void exportLocationCsv()} />
             <SettingsDivider palette={palette} />
-            <SettingsRow Icon={Download} detail="Local JSON file" palette={palette} title="Save Local Backup" onPress={() => void writeLocalBackupFile()} />
+            <SettingsRow
+              Icon={Download}
+              detail="Local JSON file"
+              disabled={isBackupBusy}
+              palette={palette}
+              title={isBackupBusy ? "Working..." : "Save Local Backup"}
+              onPress={() => void saveLocalBackup()}
+            />
             <SettingsDivider palette={palette} />
             <SettingsRow Icon={LogOut} destructive detail={googleConnection.isConnected ? "Remove saved token" : "No account connected"} palette={palette} title="Disconnect Google" onPress={() => void disconnectGoogleDrive()} />
             <SettingsDivider palette={palette} />
@@ -560,6 +593,11 @@ export function SettingsScreen() {
           setActiveDrawer(null);
           void updateSetting("appearance", value as typeof settings.appearance);
         }}
+      />
+      <BackupProgressDialog
+        palette={getBackupProgressDialogPalette(palette)}
+        progress={backupProgress}
+        visible={Boolean(backupProgress)}
       />
     </>
   );
@@ -927,6 +965,18 @@ function getSettingsYearSelectorPalette(palette: SettingsPalette): YearSelectorP
     glassBorderActive: isDark ? "rgba(255,255,255,0.38)" : "rgba(0,0,0,0.18)",
     glassRim: palette.groupBorder,
     glassShadow: "#000000"
+  };
+}
+
+function getBackupProgressDialogPalette(palette: SettingsPalette): BackupProgressDialogPalette {
+  return {
+    backdrop: palette.drawerBackdrop,
+    border: palette.groupBorder,
+    foreground: palette.foreground,
+    muted: palette.muted,
+    surface: palette.drawer,
+    tint: palette.tint,
+    track: palette.divider
   };
 }
 

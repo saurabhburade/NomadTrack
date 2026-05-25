@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, View, type ColorValue, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View, type ColorValue, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
 import { NativeButton } from "../native/NativeButton";
 
 const ACTION_BUTTON_HEIGHT = 42;
@@ -10,6 +10,7 @@ type DrawerActionButtonProps = {
   borderColor: ColorValue;
   disabled?: boolean;
   foregroundColor: ColorValue;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
   systemImage?: string;
   title: string;
@@ -20,7 +21,7 @@ function colorString(color: ColorValue) {
   return String(color);
 }
 
-export function DrawerActionButton({ backgroundColor, borderColor, disabled, foregroundColor, style, systemImage, title, onPress }: DrawerActionButtonProps) {
+export function DrawerActionButton({ backgroundColor, borderColor, disabled, foregroundColor, loading, style, systemImage, title, onPress }: DrawerActionButtonProps) {
   const [buttonWidth, setButtonWidth] = useState<number>();
   const buttonBackgroundColor = colorString(backgroundColor);
   const buttonBorderColor = colorString(borderColor);
@@ -36,25 +37,28 @@ export function DrawerActionButton({ backgroundColor, borderColor, disabled, for
     }
   }, []);
 
+  const isDisabled = disabled || loading;
+
   return (
-    <View style={[styles.button, disabled ? styles.disabled : null, style]} onLayout={handleLayout}>
-      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={disabled} style={[styles.edgeTapTarget, styles.leftEdgeTapTarget]} onPress={onPress} />
+    <View style={[styles.button, isDisabled ? styles.disabled : null, style]} onLayout={handleLayout}>
+      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={isDisabled} style={[styles.edgeTapTarget, styles.leftEdgeTapTarget]} onPress={onPress} />
       <NativeButton
         accessibilityLabel={title}
         color={isProminent ? backgroundColor : foregroundColor}
         controlSize="small"
-        disabled={disabled}
+        disabled={isDisabled}
         foregroundColor={foregroundColor}
         frame={frame}
         fullWidth
         role={role}
         style={styles.nativeButton}
-        systemImage={systemImage}
+        systemImage={loading ? undefined : systemImage}
         title={title}
         variant={isProminent ? "glassProminent" : "glass"}
         onPress={onPress}
       />
-      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={disabled} style={[styles.edgeTapTarget, styles.rightEdgeTapTarget]} onPress={onPress} />
+      {loading ? <ActivityIndicator color={String(foregroundColor)} size="small" style={styles.loadingIndicator} /> : null}
+      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={isDisabled} style={[styles.edgeTapTarget, styles.rightEdgeTapTarget]} onPress={onPress} />
     </View>
   );
 }
@@ -78,6 +82,11 @@ const styles = StyleSheet.create({
   },
   leftEdgeTapTarget: {
     left: 0
+  },
+  loadingIndicator: {
+    left: 20,
+    position: "absolute",
+    top: 11
   },
   nativeButton: {
     alignSelf: "center",

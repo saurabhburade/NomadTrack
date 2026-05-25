@@ -103,11 +103,7 @@ private struct CalendarToolbarRootView: View {
 
         Spacer(minLength: 12)
 
-        Menu {
-          Button(action: onManualEntry) {
-            Label("Manual Entry", systemImage: "pencil.line")
-          }
-        } label: {
+        Button(action: onManualEntry) {
           Image(systemName: "plus")
             .font(.system(size: 21, weight: .semibold))
             .frame(width: calendarToolbarIconButtonFrame, height: calendarToolbarIconButtonFrame)

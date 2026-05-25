@@ -16,6 +16,7 @@ export function NativeManualEntrySheet(_props: {
   countries: NativeEditDaySheetCountry[];
   existingRecords: NativeManualEntryExistingRecord[];
   initialDate: string;
+  isSaving?: boolean;
   palette: NativeManualEntrySheetPalette;
   style?: StyleProp<ViewStyle>;
   visible: boolean;

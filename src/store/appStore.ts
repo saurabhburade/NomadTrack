@@ -37,6 +37,7 @@ type AppState = {
   mapPoints: LocationPoint[];
   trips: Trip[];
   monthRecords: DayRecordPreview[];
+  monthRecordsMonth: string;
   yearRecords: DayRecordPreview[];
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -94,6 +95,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mapPoints: [],
   trips: [],
   monthRecords: [],
+  monthRecordsMonth: today.slice(0, 7),
   yearRecords: [],
   initialize: async () => {
     try {
@@ -117,12 +119,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   refresh: async () => {
     const loadSequence = ++dataLoadSequence;
+    const selectedDateForLoad = get().selectedDate;
     const [settings, summary, mapPoints, trips, monthRecords, yearRecords] = await Promise.all([
       readSettings(),
       readDashboardSummary(),
       readLocationPointsForDashboardYear(),
       readTrips(),
-      readDayRecordsForMonth(get().selectedDate),
+      readDayRecordsForMonth(selectedDateForLoad),
       readDayRecordsForDashboardYear()
     ]);
     const isOffline = await readNetworkOfflineState();
@@ -134,6 +137,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       mapPoints,
       trips,
       monthRecords: monthRecords as DayRecordPreview[],
+      monthRecordsMonth: getMonthKey(selectedDateForLoad),
       yearRecords: yearRecords as DayRecordPreview[],
       isOffline
     });
@@ -147,7 +151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const [mapPoints, monthRecords] = await Promise.all([readLocationPointsForDashboardYear(), readDayRecordsForMonth(date)]);
     if (loadSequence !== dataLoadSequence) return;
 
-    set({ mapPoints, monthRecords: monthRecords as DayRecordPreview[] });
+    set({ mapPoints, monthRecords: monthRecords as DayRecordPreview[], monthRecordsMonth: getMonthKey(date) });
   },
   addManualEntry: async (entry) => {
     await insertManualTravelEntry(entry);
@@ -186,3 +190,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }
 }));
+
+function getMonthKey(date: string) {
+  return date.slice(0, 7);
+}

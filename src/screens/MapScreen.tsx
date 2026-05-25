@@ -38,6 +38,7 @@ export function MapScreen() {
   const maxCountryWeight = useMemo(() => Math.max(1, ...countryAreas.map((area) => area.weight)), [countryAreas]);
   const cityPoints = useMemo(() => getCityPoints(gpsDayEntries), [gpsDayEntries]);
   const maxCityWeight = useMemo(() => Math.max(1, ...cityPoints.map((point) => point.weight)), [cityPoints]);
+  const mapContentKey = useMemo(() => getMapContentKey(countryAreas, cityPoints), [countryAreas, cityPoints]);
   const yearLabel = getFiscalYearLabel(settings.residencyYearEnd, settings.calendarYearMode);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export function MapScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: palette.screen }}>
       <MapView
+        key={mapContentKey}
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
@@ -338,6 +340,12 @@ function renderCityPoint(point: HeatPoint, maxWeight: number) {
       zIndex={6}
     />
   ];
+}
+
+function getMapContentKey(countryAreas: CountryArea[], cityPoints: HeatPoint[]) {
+  const countries = countryAreas.map((area) => `${area.countryCode}:${area.weight}:${area.polygons.length}`).join("|");
+  const cities = cityPoints.map((point) => `${point.key}:${point.weight}`).join("|");
+  return `countries=${countries};cities=${cities}`;
 }
 
 function getMapYearWindow(settings: AppSettings) {

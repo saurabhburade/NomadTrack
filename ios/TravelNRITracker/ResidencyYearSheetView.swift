@@ -390,14 +390,17 @@ private extension View {
       self
         .presentationDetents([.height(330)])
         .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled(true)
         .presentationCornerRadius(34)
         .presentationBackground(.ultraThinMaterial)
     } else if #available(iOS 16.0, *) {
       self
         .presentationDetents([.height(330)])
         .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled(true)
     } else {
       self
+        .interactiveDismissDisabled(true)
     }
   }
 

@@ -23,6 +23,7 @@ private struct ManualEntryExistingRecord: Identifiable, Equatable {
 
 private final class ManualEntrySheetModel: ObservableObject {
   @Published var visible = false
+  @Published var isSaving = false
   @Published var initialDate = ""
   @Published var countries: [ManualEntryCountry] = []
   @Published var existingRecords: [ManualEntryExistingRecord] = []
@@ -53,6 +54,7 @@ private final class ManualEntrySheetModel: ObservableObject {
 @objc(ManualEntrySheetHostingView)
 final class ManualEntrySheetHostingView: UIView {
   @objc var visible: Bool = false { didSet { updateModel() } }
+  @objc var isSaving: Bool = false { didSet { updateModel() } }
   @objc var initialDate: NSString = "" { didSet { updateModel() } }
   @objc var countryOptions: NSArray = [] { didSet { updateModel() } }
   @objc var existingRecords: NSArray = [] { didSet { updateModel() } }
@@ -115,6 +117,7 @@ final class ManualEntrySheetHostingView: UIView {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.model.visible = self.visible
+      self.model.isSaving = self.isSaving
       self.model.initialDate = String(self.initialDate)
       self.model.countries = self.parseCountries()
       self.model.existingRecords = self.parseExistingRecords()
@@ -177,6 +180,11 @@ private struct ManualEntrySheetRootView: View {
       .sheet(isPresented: Binding(
         get: { model.visible },
         set: { isPresented in
+          if !isPresented && model.isSaving {
+            model.visible = true
+            return
+          }
+
           if !isPresented && model.visible {
             model.visible = false
             model.onClose?(NSDictionary())
@@ -196,6 +204,7 @@ private struct ManualEntrySheetRootView: View {
           focusedField: $focusedField
         )
         .manualEntrySheetPresentation()
+        .interactiveDismissDisabled(model.isSaving)
       }
       .onAppear {
         if model.visible {
@@ -377,6 +386,7 @@ private struct ManualEntrySheetContent: View {
         } label: {
           ManualEntryActionLabel(title: "Clear", systemImage: "trash", color: colors.errorText)
         }
+        .disabled(model.isSaving)
         .manualEntryGlassButtonStyle(tint: colors.errorText, prominent: false, controlSize: .small)
 
         Button(role: .cancel) {
@@ -386,13 +396,20 @@ private struct ManualEntrySheetContent: View {
         } label: {
           ManualEntryActionLabel(title: "Cancel", color: colors.foreground)
         }
+        .disabled(model.isSaving)
         .manualEntryGlassButtonStyle(tint: colors.foreground, prominent: false, controlSize: .small)
 
         Button {
           submit()
         } label: {
-          ManualEntryActionLabel(title: "Confirm", systemImage: "checkmark", color: colors.actionPrimaryForeground)
+          ManualEntryActionLabel(
+            title: model.isSaving ? "Saving" : "Confirm",
+            systemImage: model.isSaving ? nil : "checkmark",
+            color: colors.actionPrimaryForeground,
+            isLoading: model.isSaving
+          )
         }
+        .disabled(model.isSaving)
         .manualEntryGlassButtonStyle(tint: colors.actionPrimaryForeground, prominent: true, controlSize: .small)
       }
       .padding(.horizontal, 28)
@@ -683,9 +700,17 @@ private struct ManualEntryCalendarDayCell: View {
           .offset(y: -7)
         }
 
-        Text("\(cell.day)")
-          .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(isSelected ? colors.selectedForeground : colors.foreground)
+        VStack(spacing: -2) {
+          Text("\(cell.day)")
+            .font(.system(size: existingCountryCode == nil ? 14 : 10, weight: .bold))
+            .foregroundStyle(isSelected ? colors.selectedForeground : colors.foreground)
+
+          if let existingCountryCode {
+            Text(manualEntryFlag(for: existingCountryCode))
+              .font(.system(size: 10))
+              .lineLimit(1)
+          }
+        }
           .frame(width: 30, height: 30)
           .manualEntryGlassBackground(
             fill: isSelected ? colors.selectedFill : .clear,
@@ -694,13 +719,6 @@ private struct ManualEntryCalendarDayCell: View {
           )
           .opacity(dayOpacity)
           .frame(maxHeight: .infinity, alignment: .center)
-
-        if let existingCountryCode {
-          Text(manualEntryFlag(for: existingCountryCode))
-            .font(.system(size: 10))
-            .opacity(dayOpacity)
-            .offset(y: 2)
-        }
       }
       .frame(maxWidth: .infinity)
       .frame(height: 44)
@@ -856,10 +874,17 @@ private struct ManualEntryActionLabel: View {
   let title: String
   var systemImage: String? = nil
   let color: Color
+  var isLoading = false
 
   var body: some View {
     HStack(alignment: .center, spacing: 7) {
-      if let systemImage {
+      if isLoading {
+        ProgressView()
+          .progressViewStyle(.circular)
+          .tint(color)
+          .controlSize(.small)
+          .frame(width: 18, height: 34, alignment: .center)
+      } else if let systemImage {
         Image(systemName: systemImage)
           .font(.system(size: 17, weight: .semibold))
           .frame(width: 18, height: 34, alignment: .center)

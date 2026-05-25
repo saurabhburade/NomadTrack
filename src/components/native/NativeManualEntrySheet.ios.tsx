@@ -36,6 +36,7 @@ type NativeManualEntrySheetViewProps = ViewProps & {
   initialDate: string;
   inputBorderColorValue: string;
   inputFillColorValue: string;
+  isSaving: boolean;
   menuGlassFillColorValue: string;
   mutedColorValue: string;
   placeholderColorValue: string;
@@ -54,6 +55,7 @@ type NativeManualEntrySheetProps = {
   existingRecords: NativeManualEntryExistingRecord[];
   initialDate: string;
   palette: NativeManualEntrySheetPalette;
+  isSaving?: boolean;
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
@@ -80,6 +82,7 @@ export function NativeManualEntrySheet({
   existingRecords,
   initialDate,
   palette,
+  isSaving = false,
   style,
   visible,
   onClose,
@@ -103,6 +106,7 @@ export function NativeManualEntrySheet({
       initialDate={initialDate}
       inputBorderColorValue={palette.inputBorder}
       inputFillColorValue={palette.inputFill}
+      isSaving={isSaving}
       menuGlassFillColorValue={palette.menuGlassFill}
       mutedColorValue={palette.muted}
       placeholderColorValue={palette.placeholder}

@@ -65,7 +65,7 @@ Create OAuth clients in Google Cloud Console and enable the Google Drive API. Th
 - `profile`
 - `https://www.googleapis.com/auth/drive.file`
 
-Backups are calendar-year JSON snapshots uploaded to `My Drive/NomadTrack/<year>/travel-nri-tracker-backup.json`, for example `NomadTrack/2026/travel-nri-tracker-backup.json`. Drive is not treated as a real-time database.
+Backups are full travel-history JSON snapshots uploaded to `My Drive/NomadTrack/all-data/travel-nri-tracker-backup.json`. Drive is not treated as a real-time database.
 
 ## Reverse geocoding
 
