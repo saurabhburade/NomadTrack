@@ -2,7 +2,7 @@ import React
 import SwiftUI
 import UIKit
 
-private let calendarMonthButtonBlurReplaceAnimation = Animation.easeInOut(duration: 0.22)
+private let calendarMonthButtonBlurReplaceAnimation = Animation.easeInOut(duration: 0.28)
 
 final class CalendarMonthButtonHostingView: UIView {
   @objc var label: NSString = "" {
@@ -130,17 +130,38 @@ private struct CalendarMonthButtonRootView: View {
 private extension View {
   @ViewBuilder
   func calendarMonthButtonBlurReplace<ID: Hashable>(id: ID) -> some View {
-    if #available(iOS 17.0, *) {
-      self
-        .id(id)
-        .transition(.blurReplace)
-        .animation(calendarMonthButtonBlurReplaceAnimation, value: id)
-    } else {
-      self
-        .id(id)
-        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-        .animation(calendarMonthButtonBlurReplaceAnimation, value: id)
-    }
+    self
+      .id(id)
+      .transition(.calendarMonthButtonVisibleBlurReplace)
+      .animation(calendarMonthButtonBlurReplaceAnimation, value: id)
+  }
+}
+
+private struct CalendarMonthButtonBlurReplaceModifier: ViewModifier {
+  let radius: CGFloat
+  let opacity: Double
+  let scale: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .blur(radius: radius)
+      .opacity(opacity)
+      .scaleEffect(scale)
+  }
+}
+
+private extension AnyTransition {
+  static var calendarMonthButtonVisibleBlurReplace: AnyTransition {
+    .asymmetric(
+      insertion: .modifier(
+        active: CalendarMonthButtonBlurReplaceModifier(radius: 8, opacity: 0, scale: 0.96),
+        identity: CalendarMonthButtonBlurReplaceModifier(radius: 0, opacity: 1, scale: 1)
+      ),
+      removal: .modifier(
+        active: CalendarMonthButtonBlurReplaceModifier(radius: 8, opacity: 0, scale: 0.96),
+        identity: CalendarMonthButtonBlurReplaceModifier(radius: 0, opacity: 1, scale: 1)
+      )
+    )
   }
 }
 

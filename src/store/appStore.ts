@@ -1,6 +1,7 @@
 import * as Network from "expo-network";
 import { create } from "zustand";
 import {
+  clearManualEntryRange as clearStoredManualEntryRange,
   defaultSettings,
   deleteDayEntry as deleteStoredDayEntry,
   insertManualTravelEntry,
@@ -41,6 +42,7 @@ type AppState = {
   refresh: () => Promise<void>;
   setSelectedDate: (date: string) => Promise<void>;
   addManualEntry: (entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) => Promise<void>;
+  clearManualEntryRange: (entry: { startDate: string; endDate: string }) => Promise<void>;
   updateDayEntry: (entry: { originalDate: string; date: string; countryCode: string; countryName: string }) => Promise<void>;
   deleteDayEntry: (date: string) => Promise<void>;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
@@ -149,6 +151,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   addManualEntry: async (entry) => {
     await insertManualTravelEntry(entry);
+    set({ selectedDate: entry.startDate });
+    await get().refresh();
+  },
+  clearManualEntryRange: async (entry) => {
+    await clearStoredManualEntryRange(entry);
     set({ selectedDate: entry.startDate });
     await get().refresh();
   },

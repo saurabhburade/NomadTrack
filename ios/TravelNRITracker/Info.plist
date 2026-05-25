@@ -74,8 +74,6 @@
       <string>location</string>
       <string>processing</string>
     </array>
-    <key>UILaunchStoryboardName</key>
-    <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
       <string>arm64</string>

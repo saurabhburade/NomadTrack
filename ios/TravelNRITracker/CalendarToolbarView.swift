@@ -2,7 +2,7 @@ import React
 import SwiftUI
 import UIKit
 
-private let calendarToolbarBlurReplaceAnimation = Animation.easeInOut(duration: 0.22)
+private let calendarToolbarBlurReplaceAnimation = Animation.easeInOut(duration: 0.28)
 private let calendarToolbarIconButtonFrame: CGFloat = 38
 
 final class CalendarToolbarHostingView: UIView {
@@ -193,17 +193,38 @@ private extension View {
 
   @ViewBuilder
   func calendarToolbarBlurReplace<ID: Hashable>(id: ID) -> some View {
-    if #available(iOS 17.0, *) {
-      self
-        .id(id)
-        .transition(.blurReplace)
-        .animation(calendarToolbarBlurReplaceAnimation, value: id)
-    } else {
-      self
-        .id(id)
-        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-        .animation(calendarToolbarBlurReplaceAnimation, value: id)
-    }
+    self
+      .id(id)
+      .transition(.calendarToolbarVisibleBlurReplace)
+      .animation(calendarToolbarBlurReplaceAnimation, value: id)
+  }
+}
+
+private struct CalendarToolbarBlurReplaceModifier: ViewModifier {
+  let radius: CGFloat
+  let opacity: Double
+  let scale: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .blur(radius: radius)
+      .opacity(opacity)
+      .scaleEffect(scale)
+  }
+}
+
+private extension AnyTransition {
+  static var calendarToolbarVisibleBlurReplace: AnyTransition {
+    .asymmetric(
+      insertion: .modifier(
+        active: CalendarToolbarBlurReplaceModifier(radius: 8, opacity: 0, scale: 0.96),
+        identity: CalendarToolbarBlurReplaceModifier(radius: 0, opacity: 1, scale: 1)
+      ),
+      removal: .modifier(
+        active: CalendarToolbarBlurReplaceModifier(radius: 8, opacity: 0, scale: 0.96),
+        identity: CalendarToolbarBlurReplaceModifier(radius: 0, opacity: 1, scale: 1)
+      )
+    )
   }
 }
 

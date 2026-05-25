@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1F497C1C2ED16D6A8C447571 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F893A67DEAEBE40E62BE1800 /* PrivacyInfo.xcprivacy */; };
-		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		AC921DFAA222F54D77ADA720 /* libPods-TravelNRITracker.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ED9838B776239018FC6246CF /* libPods-TravelNRITracker.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */; };
@@ -48,7 +47,6 @@
 		2AE5ECB4E8AC4711BB37D064 /* Pods-TravelNRITracker.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TravelNRITracker.debug.xcconfig"; path = "Target Support Files/Pods-TravelNRITracker/Pods-TravelNRITracker.debug.xcconfig"; sourceTree = "<group>"; };
 		5C53743FEC5B0AE65FD7D662 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-TravelNRITracker/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		6D85A0DB2C44FCA18E18FD4B /* Pods-TravelNRITracker.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TravelNRITracker.release.xcconfig"; path = "Target Support Files/Pods-TravelNRITracker/Pods-TravelNRITracker.release.xcconfig"; sourceTree = "<group>"; };
-		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = TravelNRITracker/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ForceQuitLocationModule.swift; path = TravelNRITracker/ForceQuitLocationModule.swift; sourceTree = "<group>"; };
 		C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ForceQuitLocationModuleBridge.m; path = TravelNRITracker/ForceQuitLocationModuleBridge.m; sourceTree = "<group>"; };
@@ -127,7 +125,6 @@
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
-				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				F893A67DEAEBE40E62BE1800 /* PrivacyInfo.xcprivacy */,
 			);
 			name = TravelNRITracker;
@@ -270,7 +267,6 @@
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
-				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				1F497C1C2ED16D6A8C447571 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -356,7 +352,6 @@
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoMediaLibrary/ExpoMediaLibrary_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RNBackgroundGeolocation/TSLocationManagerPrivacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
@@ -376,7 +371,6 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoMediaLibrary_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/TSLocationManagerPrivacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",

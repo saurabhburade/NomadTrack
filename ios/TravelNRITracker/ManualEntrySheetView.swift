@@ -46,6 +46,7 @@ private final class ManualEntrySheetModel: ObservableObject {
   @Published var weekday = "#6d6d72"
 
   var onClose: ManualEntryEventBlock?
+  var onClear: ManualEntryEventBlock?
   var onConfirm: ManualEntryEventBlock?
 }
 
@@ -75,6 +76,7 @@ final class ManualEntrySheetHostingView: UIView {
   @objc var weekdayColorValue: NSString = "#6d6d72" { didSet { updateModel() } }
 
   @objc var onClose: ManualEntryEventBlock? { didSet { model.onClose = onClose } }
+  @objc var onClear: ManualEntryEventBlock? { didSet { model.onClear = onClear } }
   @objc var onConfirm: ManualEntryEventBlock? { didSet { model.onConfirm = onConfirm } }
 
   private let model = ManualEntrySheetModel()
@@ -320,19 +322,7 @@ private struct ManualEntrySheetContent: View {
         }
         .padding(.top, 24)
 
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
-          ForEach(matchingCountries) { country in
-            ManualEntryCountryChip(
-              country: country,
-              isSelected: selectedCountry?.code == country.code,
-              colors: colors
-            ) {
-              countryInput = country.name
-              errorMessage = nil
-              focusedField.wrappedValue = false
-            }
-          }
-        }
+        countryChips
         .padding(.top, 18)
 
         if let errorMessage {
@@ -381,22 +371,27 @@ private struct ManualEntrySheetContent: View {
       .frame(height: 46)
       .allowsHitTesting(false)
 
-      HStack(spacing: 8) {
+      HStack(alignment: .center, spacing: 8) {
+        Button(role: .destructive) {
+          requestClear()
+        } label: {
+          ManualEntryActionLabel(title: "Clear", systemImage: "trash", color: colors.errorText)
+        }
+        .manualEntryGlassButtonStyle(tint: colors.errorText, prominent: false, controlSize: .small)
+
         Button(role: .cancel) {
           focusedField.wrappedValue = false
           model.visible = false
           model.onClose?(NSDictionary())
         } label: {
-          Text("Cancel")
-            .manualEntryActionLabel(color: colors.foreground)
+          ManualEntryActionLabel(title: "Cancel", color: colors.foreground)
         }
         .manualEntryGlassButtonStyle(tint: colors.foreground, prominent: false, controlSize: .small)
 
         Button {
           submit()
         } label: {
-          Label("Confirm", systemImage: "checkmark")
-            .manualEntryActionLabel(color: colors.actionPrimaryForeground)
+          ManualEntryActionLabel(title: "Confirm", systemImage: "checkmark", color: colors.actionPrimaryForeground)
         }
         .manualEntryGlassButtonStyle(tint: colors.actionPrimaryForeground, prominent: true, controlSize: .small)
       }
@@ -405,6 +400,53 @@ private struct ManualEntrySheetContent: View {
       .padding(.bottom, 14)
       .background(colors.background.opacity(0.74))
     }
+  }
+
+  @ViewBuilder
+  private var countryChips: some View {
+    if #available(iOS 16.0, *) {
+      ManualEntryFlowLayout(spacing: 8) {
+        countryChipButtons
+      }
+    } else {
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
+        countryChipButtons
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var countryChipButtons: some View {
+    ForEach(matchingCountries) { country in
+      ManualEntryCountryChip(
+        country: country,
+        isSelected: selectedCountry?.code == country.code,
+        colors: colors
+      ) {
+        countryInput = country.name
+        errorMessage = nil
+        focusedField.wrappedValue = false
+      }
+    }
+  }
+
+  private func requestClear() {
+    focusedField.wrappedValue = false
+
+    guard isValidManualEntryISODate(startDate), isValidManualEntryISODate(endDate) else {
+      errorMessage = "Enter dates as YYYY-MM-DD."
+      return
+    }
+
+    guard startDate <= endDate else {
+      errorMessage = "End date must be on or after start date."
+      return
+    }
+
+    model.onClear?([
+      "startDate": startDate,
+      "endDate": endDate
+    ] as NSDictionary)
   }
 
   private func submit() {
@@ -451,10 +493,10 @@ private struct ManualEntryDateRangePicker: View {
     buildManualEntryMonthCells(visibleMonth)
   }
   private var previousMonth: Date {
-    Calendar(identifier: .gregorian).date(byAdding: .month, value: -1, to: visibleMonth) ?? visibleMonth
+    manualEntryCalendar().date(byAdding: .month, value: -1, to: visibleMonth) ?? visibleMonth
   }
   private var nextMonth: Date {
-    Calendar(identifier: .gregorian).date(byAdding: .month, value: 1, to: visibleMonth) ?? visibleMonth
+    manualEntryCalendar().date(byAdding: .month, value: 1, to: visibleMonth) ?? visibleMonth
   }
   private var canShowPreviousMonth: Bool {
     manualEntryISODate(manualEntryEndOfMonth(previousMonth)) >= activeMinDate
@@ -736,6 +778,103 @@ private struct ManualEntryMonthCell {
   let day: Int
 }
 
+@available(iOS 16.0, *)
+private struct ManualEntryFlowLayout: Layout {
+  let spacing: CGFloat
+
+  init(spacing: CGFloat) {
+    self.spacing = spacing
+  }
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let rows = makeRows(proposal: proposal, subviews: subviews)
+    let width = proposal.width ?? rows.map(\.width).max() ?? 0
+    let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
+    return CGSize(width: width, height: height)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    let rows = makeRows(proposal: ProposedViewSize(width: bounds.width, height: bounds.height), subviews: subviews)
+    var y = bounds.minY
+
+    for row in rows {
+      var x = bounds.minX
+
+      for index in row.itemIndices {
+        let size = subviews[index].sizeThatFits(.unspecified)
+        subviews[index].place(
+          at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+          proposal: ProposedViewSize(width: size.width, height: size.height)
+        )
+        x += size.width + spacing
+      }
+
+      y += row.height + spacing
+    }
+  }
+
+  private func makeRows(proposal: ProposedViewSize, subviews: Subviews) -> [ManualEntryFlowRow] {
+    let maxWidth = proposal.width ?? .infinity
+    var rows: [ManualEntryFlowRow] = []
+    var currentItemIndices: [Int] = []
+    var currentWidth: CGFloat = 0
+    var currentHeight: CGFloat = 0
+
+    for index in subviews.indices {
+      let subview = subviews[index]
+      let size = subview.sizeThatFits(.unspecified)
+      let nextWidth = currentItemIndices.isEmpty ? size.width : currentWidth + spacing + size.width
+
+      if nextWidth > maxWidth, !currentItemIndices.isEmpty {
+        rows.append(ManualEntryFlowRow(itemIndices: currentItemIndices, width: currentWidth, height: currentHeight))
+        currentItemIndices = [index]
+        currentWidth = size.width
+        currentHeight = size.height
+      } else {
+        currentItemIndices.append(index)
+        currentWidth = nextWidth
+        currentHeight = max(currentHeight, size.height)
+      }
+    }
+
+    if !currentItemIndices.isEmpty {
+      rows.append(ManualEntryFlowRow(itemIndices: currentItemIndices, width: currentWidth, height: currentHeight))
+    }
+
+    return rows
+  }
+}
+
+@available(iOS 16.0, *)
+private struct ManualEntryFlowRow {
+  let itemIndices: [Int]
+  let width: CGFloat
+  let height: CGFloat
+}
+
+private struct ManualEntryActionLabel: View {
+  let title: String
+  var systemImage: String? = nil
+  let color: Color
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 7) {
+      if let systemImage {
+        Image(systemName: systemImage)
+          .font(.system(size: 17, weight: .semibold))
+          .frame(width: 18, height: 34, alignment: .center)
+      }
+
+      Text(title)
+        .font(.system(size: 16, weight: .semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+    }
+    .foregroundStyle(color)
+    .frame(maxWidth: .infinity, minHeight: 34, maxHeight: 34, alignment: .center)
+  }
+}
+
 private extension View {
   @ViewBuilder
   func manualEntrySheetPresentation() -> some View {
@@ -799,18 +938,10 @@ private extension View {
     }
   }
 
-  func manualEntryActionLabel(color: Color) -> some View {
-    self
-      .font(.system(size: 16, weight: .semibold))
-      .foregroundStyle(color)
-      .lineLimit(1)
-      .minimumScaleFactor(0.72)
-      .frame(maxWidth: .infinity, minHeight: 34)
-  }
 }
 
 private func buildManualEntryMonthCells(_ month: Date) -> [ManualEntryMonthCell?] {
-  let calendar = Calendar(identifier: .gregorian)
+  let calendar = manualEntryCalendar()
   let monthStart = manualEntryStartOfMonth(month)
   let range = calendar.range(of: .day, in: .month, for: monthStart) ?? 1..<1
   let leadingDays = calendar.component(.weekday, from: monthStart) - 1
@@ -830,7 +961,7 @@ private func buildManualEntryMonthCells(_ month: Date) -> [ManualEntryMonthCell?
 
 private func defaultManualEntryEndDate(_ startDate: String) -> String {
   guard let date = manualEntryDate(from: startDate),
-        let nextDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: 1, to: date)
+        let nextDate = manualEntryCalendar().date(byAdding: .day, value: 1, to: date)
   else { return startDate }
 
   let next = manualEntryISODate(nextDate)
@@ -853,21 +984,29 @@ private func manualEntryISODate(_ date: Date) -> String {
 
 private func manualEntryISOFormatter() -> DateFormatter {
   let formatter = DateFormatter()
-  formatter.calendar = Calendar(identifier: .gregorian)
+  formatter.calendar = manualEntryCalendar()
   formatter.locale = Locale(identifier: "en_US_POSIX")
   formatter.timeZone = TimeZone(secondsFromGMT: 0)
   formatter.dateFormat = "yyyy-MM-dd"
   return formatter
 }
 
+private func manualEntryCalendar() -> Calendar {
+  var calendar = Calendar(identifier: .gregorian)
+  if let utc = TimeZone(secondsFromGMT: 0) {
+    calendar.timeZone = utc
+  }
+  return calendar
+}
+
 private func manualEntryStartOfMonth(_ date: Date) -> Date {
-  let calendar = Calendar(identifier: .gregorian)
+  let calendar = manualEntryCalendar()
   let components = calendar.dateComponents([.year, .month], from: date)
   return calendar.date(from: components) ?? date
 }
 
 private func manualEntryEndOfMonth(_ date: Date) -> Date {
-  let calendar = Calendar(identifier: .gregorian)
+  let calendar = manualEntryCalendar()
   let start = manualEntryStartOfMonth(date)
   let nextMonth = calendar.date(byAdding: .month, value: 1, to: start) ?? start
   return calendar.date(byAdding: .day, value: -1, to: nextMonth) ?? start
@@ -875,8 +1014,9 @@ private func manualEntryEndOfMonth(_ date: Date) -> Date {
 
 private func manualEntryMonthTitle(_ date: Date) -> String {
   let formatter = DateFormatter()
-  formatter.calendar = Calendar(identifier: .gregorian)
+  formatter.calendar = manualEntryCalendar()
   formatter.locale = Locale(identifier: "en_US_POSIX")
+  formatter.timeZone = TimeZone(secondsFromGMT: 0)
   formatter.dateFormat = "MMMM yyyy"
   return formatter.string(from: date)
 }
@@ -884,8 +1024,9 @@ private func manualEntryMonthTitle(_ date: Date) -> String {
 private func manualEntryCompactDate(_ iso: String) -> String {
   guard let date = manualEntryDate(from: iso) else { return iso }
   let formatter = DateFormatter()
-  formatter.calendar = Calendar(identifier: .gregorian)
+  formatter.calendar = manualEntryCalendar()
   formatter.locale = Locale(identifier: "en_US_POSIX")
+  formatter.timeZone = TimeZone(secondsFromGMT: 0)
   formatter.dateFormat = "MMM d"
   return formatter.string(from: date)
 }

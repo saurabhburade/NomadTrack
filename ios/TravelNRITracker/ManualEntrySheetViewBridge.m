@@ -42,6 +42,7 @@ RCT_EXPORT_VIEW_PROPERTY(placeholderColorValue, NSString)
 RCT_EXPORT_VIEW_PROPERTY(weekdayColorValue, NSString)
 
 RCT_EXPORT_VIEW_PROPERTY(onClose, RCTBubblingEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onClear, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onConfirm, RCTBubblingEventBlock)
 
 @end

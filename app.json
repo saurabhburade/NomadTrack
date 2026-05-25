@@ -55,17 +55,6 @@
           "locationWhenInUsePermission": "NomadTrack uses your location to build your private travel history and country day counts."
         }
       ],
-      [
-        "react-native-background-geolocation",
-        {}
-      ],
-      [
-        "expo-gradle-ext-vars",
-        {
-          "googlePlayServicesLocationVersion": "21.3.0",
-          "tslocationmanagerVersion": "4.0.+"
-        }
-      ],
       "expo-background-task",
       "expo-secure-store",
       "expo-sqlite",

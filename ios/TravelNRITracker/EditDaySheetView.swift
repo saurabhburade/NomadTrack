@@ -192,15 +192,11 @@ private struct EditDaySheetRootView: View {
         )
         .editDaySheetPresentation(height: model.canDelete ? 390 : 430)
       }
-      .confirmationDialog(
-        "Delete history entry?",
-        isPresented: $showDeleteConfirmation,
-        titleVisibility: .visible
-      ) {
+      .alert("Delete history entry?", isPresented: $showDeleteConfirmation) {
+        Button("Cancel", role: .cancel) {}
         Button("Delete", role: .destructive) {
           model.onDelete?(["date": model.initialDate])
         }
-        Button("Cancel", role: .cancel) {}
       } message: {
         Text("This removes \(model.initialDate) from History.")
       }

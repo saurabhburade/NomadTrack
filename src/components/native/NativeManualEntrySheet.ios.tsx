@@ -17,6 +17,11 @@ type ConfirmEvent = NativeSyntheticEvent<{
   startDate: string;
 }>;
 
+type ClearEvent = NativeSyntheticEvent<{
+  endDate: string;
+  startDate: string;
+}>;
+
 type NativeManualEntrySheetViewProps = ViewProps & {
   actionPrimaryForegroundColorValue: string;
   actionSecondaryBorderColorValue: string;
@@ -40,6 +45,7 @@ type NativeManualEntrySheetViewProps = ViewProps & {
   visible: boolean;
   weekdayColorValue: string;
   onClose: () => void;
+  onClear: (event: ClearEvent) => void;
   onConfirm: (event: ConfirmEvent) => void;
 };
 
@@ -51,6 +57,10 @@ type NativeManualEntrySheetProps = {
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
+  onClear: (entry: {
+    startDate: string;
+    endDate: string;
+  }) => void;
   onConfirm: (entry: {
     startDate: string;
     endDate: string;
@@ -73,6 +83,7 @@ export function NativeManualEntrySheet({
   style,
   visible,
   onClose,
+  onClear,
   onConfirm
 }: NativeManualEntrySheetProps) {
   if (!ManualEntrySheetView) return null;
@@ -102,6 +113,12 @@ export function NativeManualEntrySheet({
       visible={visible}
       weekdayColorValue={palette.weekday}
       onClose={onClose}
+      onClear={(event) => {
+        onClear({
+          endDate: event.nativeEvent.endDate,
+          startDate: event.nativeEvent.startDate
+        });
+      }}
       onConfirm={(event) => {
         onConfirm({
           countryCode: event.nativeEvent.countryCode,

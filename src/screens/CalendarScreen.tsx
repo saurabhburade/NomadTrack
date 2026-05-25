@@ -7,7 +7,7 @@ import { BlurView } from "expo-blur";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { NativeCalendarMonthGrid, isNativeCalendarMonthGridAvailable } from "../components/native/NativeCalendarMonthGrid";
+import { NativeCalendarMonthGrid, isNativeCalendarMonthGridAvailable, isNativeCalendarMonthGridSummaryAvailable } from "../components/native/NativeCalendarMonthGrid";
 import { NativeCalendarToolbar, isNativeCalendarToolbarAvailable } from "../components/native/NativeCalendarToolbar";
 import { NativeEditDaySheet, isNativeEditDaySheetAvailable } from "../components/native/NativeEditDaySheet";
 import { NativeManualEntrySheet, isNativeManualEntrySheetAvailable } from "../components/native/NativeManualEntrySheet";
@@ -300,6 +300,11 @@ type ManualTravelEntry = {
   countryName: string;
 };
 
+type ManualEntryRange = {
+  startDate: string;
+  endDate: string;
+};
+
 type DayLocationEntry = {
   originalDate: string;
   date: string;
@@ -311,7 +316,7 @@ export function CalendarScreen() {
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const { monthRecords, yearRecords, selectedDate, setSelectedDate, settings, addManualEntry, updateDayEntry, deleteDayEntry } = useAppStore();
+  const { monthRecords, yearRecords, selectedDate, setSelectedDate, settings, addManualEntry, clearManualEntryRange, updateDayEntry, deleteDayEntry } = useAppStore();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getPalette(isDark);
   const calendarWidth = Math.max(280, windowWidth - 36);
@@ -344,6 +349,19 @@ export function CalendarScreen() {
     [monthRecords]
   );
   const monthSummary = useMemo(() => buildMonthSummary(monthRecords, month), [monthRecords, month]);
+  const nativeMonthSummary = useMemo(
+    () => ({
+      abroadDays: monthSummary.abroadDays,
+      countryText: buildMonthSummaryCountryText(monthSummary),
+      indiaDays: monthSummary.indiaDays,
+      pendingDays: monthSummary.pendingDays,
+      recordedDays: monthSummary.recordedDays,
+      statusText: buildMonthSummaryStatusText(monthSummary),
+      totalDays: monthSummary.totalDays,
+      travelDays: monthSummary.travelDays
+    }),
+    [monthSummary]
+  );
   const editingRecord = editingDate ? recordsByDate.get(editingDate) : undefined;
   const calendarScrollRange = useMemo(() => getCalendarScrollRange(month), [month]);
   const calendarMonthKey = useMemo(() => format(month, "yyyy-MM"), [month]);
@@ -444,6 +462,7 @@ export function CalendarScreen() {
       const isSelected = iso === selectedDateInMonth;
       const isFuture = isAfter(dayDate, parseISO(todayIso));
       const countryCode = isVisibleMonthDay ? record?.primary_country_code ?? null : null;
+      const dayOpacity = state === "disabled" || (isFuture && !countryCode) ? 0.56 : 1;
 
       return (
         <Pressable
@@ -459,21 +478,25 @@ export function CalendarScreen() {
           onTouchEnd={(event) => handleDayTouchEnd(iso, event)}
           onTouchStart={(event) => handleDayTouchStart(iso, event)}
         >
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.dayNumber,
-              {
-                color: isSelected ? palette.accent : palette.foreground,
-                opacity: state === "disabled" || (isFuture && !countryCode) ? 0.56 : 1
-              }
-            ]}
-          >
-            {date.day}
-          </Text>
-          <Text numberOfLines={1} style={styles.flagText}>
-            {countryCode ? flagForCountry(countryCode) : ""}
-          </Text>
+          <View style={[styles.dayNumberCircle, { opacity: dayOpacity }]}>
+            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={42} tint={palette.blurTint} tintColor={isSelected ? palette.selectedFill : palette.inputFill} style={StyleSheet.absoluteFill} />
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.dayNumber,
+                {
+                  color: isSelected ? palette.accent : palette.foreground
+                }
+              ]}
+            >
+              {date.day}
+            </Text>
+            {countryCode ? (
+              <Text numberOfLines={1} style={styles.dayCircleFlagText}>
+                {flagForCountry(countryCode)}
+              </Text>
+            ) : null}
+          </View>
         </Pressable>
       );
     },
@@ -499,6 +522,35 @@ export function CalendarScreen() {
   async function insertManualEntry(entry: ManualTravelEntry) {
     await addManualEntry(entry);
     setVisibleMonth(parseISO(entry.startDate));
+  }
+
+  async function clearManualRange(entry: ManualEntryRange) {
+    await clearManualEntryRange(entry);
+    setVisibleMonth(parseISO(entry.startDate));
+  }
+
+  function confirmClearManualRange(entry: ManualEntryRange, onCleared?: () => void) {
+    Alert.alert(
+      "Clear countries?",
+      `This will remove country history from ${format(parseISO(entry.startDate), "MMM d, yyyy")} to ${format(parseISO(entry.endDate), "MMM d, yyyy")}.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await clearManualRange(entry);
+                onCleared?.();
+              } catch (error) {
+                Alert.alert("Clear failed", error instanceof Error ? error.message : "Could not clear this date range.");
+              }
+            })();
+          }
+        }
+      ]
+    );
   }
 
   async function updateDay(entry: DayLocationEntry) {
@@ -567,7 +619,7 @@ export function CalendarScreen() {
             </>
           )}
 
-        <MonthSummaryPanel palette={palette} summary={monthSummary} />
+        {isNativeCalendarMonthGridSummaryAvailable ? null : <MonthSummaryPanel palette={palette} summary={monthSummary} />}
 
         {isNativeCalendarMonthGridAvailable ? (
           <NativeCalendarMonthGrid
@@ -575,12 +627,19 @@ export function CalendarScreen() {
             monthDate={format(month, "yyyy-MM-dd")}
             palette={{
               accent: palette.accent,
+              card: palette.card,
               foreground: palette.foreground,
+              inputBorder: palette.inputBorder,
+              inputFill: palette.inputFill,
+              muted: palette.muted,
               weekday: palette.weekdayHeader
             }}
             selectedDate={selectedDateInMonth}
+            summary={nativeMonthSummary}
             style={[styles.nativeCalendarMonthGrid, { width: calendarWidth }]}
             onDayPress={selectDay}
+            onNextMonth={() => void shiftMonth(1)}
+            onPreviousMonth={() => void shiftMonth(-1)}
           />
         ) : (
           <>
@@ -614,6 +673,7 @@ export function CalendarScreen() {
               removeClippedSubviews={false}
               renderHeader={() => null}
               showScrollIndicator={false}
+              showSixWeeks
               style={styles.calendarGrid}
               theme={{
                 calendarBackground: "transparent",
@@ -721,6 +781,7 @@ export function CalendarScreen() {
               }
             })();
           }}
+          onClear={(entry) => confirmClearManualRange(entry, () => setIsManualEntryOpen(false))}
         />
       ) : (
         <ManualEntryDrawer
@@ -729,6 +790,10 @@ export function CalendarScreen() {
           palette={palette}
           visible={isManualEntryOpen}
           onClose={() => setIsManualEntryOpen(false)}
+          onClearRange={async (entry) => {
+            await clearManualRange(entry);
+            setIsManualEntryOpen(false);
+          }}
           onConfirm={async (entry) => {
             await insertManualEntry(entry);
             setIsManualEntryOpen(false);
@@ -791,6 +856,7 @@ type MonthSummary = {
   abroadDays: number;
   indiaDays: number;
   manualDays: number;
+  otherCountryDays: number;
   pendingDays: number;
   recordedDays: number;
   totalDays: number;
@@ -836,13 +902,8 @@ type MonthSummaryRecord = {
 };
 
 function MonthSummaryPanel({ palette, summary }: { palette: ReturnType<typeof getPalette>; summary: MonthSummary }) {
-  const countrySummary =
-    summary.topCountries.length > 0
-      ? summary.topCountries.map((country) => `${flagForCountry(country.code)} ${country.days}d`).join("  ")
-      : "No countries tracked";
-  const statusSummary = [summary.manualDays > 0 ? `${summary.manualDays} manual` : null, summary.untrackedDays > 0 ? `${summary.untrackedDays} untracked` : null]
-    .filter(Boolean)
-    .join(" / ");
+  const countrySummary = buildMonthSummaryCountryText(summary);
+  const statusSummary = buildMonthSummaryStatusText(summary);
 
   return (
     <View style={[styles.monthSummaryPanel, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
@@ -892,6 +953,21 @@ function MonthSummaryMetric({ label, value, palette }: { label: string; value: n
   );
 }
 
+function buildMonthSummaryCountryText(summary: MonthSummary) {
+  if (summary.topCountries.length === 0) return "No countries tracked";
+
+  return [
+    ...summary.topCountries.map((country) => `${flagForCountry(country.code)} ${country.days}d`),
+    summary.otherCountryDays > 0 ? `+${summary.otherCountryDays} ${summary.otherCountryDays === 1 ? "other" : "others"}` : null
+  ]
+    .filter(Boolean)
+    .join("  ");
+}
+
+function buildMonthSummaryStatusText(summary: MonthSummary) {
+  return [summary.manualDays > 0 ? `${summary.manualDays} manual` : null, summary.untrackedDays > 0 ? `${summary.untrackedDays} untracked` : null].filter(Boolean).join(" / ");
+}
+
 function buildMonthSummary(records: MonthSummaryRecord[], month: Date): MonthSummary {
   const totalDays = endOfMonth(month).getDate();
   const recordedDates = new Set<string>();
@@ -929,14 +1005,15 @@ function buildMonthSummary(records: MonthSummaryRecord[], month: Date): MonthSum
   }
 
   const recordedDays = Math.min(recordedDates.size, totalDays);
-  const topCountries = [...countryTotals.values()]
-    .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name))
-    .slice(0, 3);
+  const sortedCountries = [...countryTotals.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+  const topCountries = sortedCountries.slice(0, 3);
+  const otherCountryDays = sortedCountries.slice(3).reduce((total, country) => total + country.days, 0);
 
   return {
     abroadDays,
     indiaDays,
     manualDays,
+    otherCountryDays,
     pendingDays,
     recordedDays,
     totalDays,
@@ -1154,6 +1231,7 @@ function ManualEntryDrawer({
   palette,
   visible,
   onClose,
+  onClearRange,
   onConfirm
 }: {
   existingRecordsByDate: ReadonlyMap<string, DayRecordPreview>;
@@ -1161,6 +1239,7 @@ function ManualEntryDrawer({
   palette: ReturnType<typeof getPalette>;
   visible: boolean;
   onClose: () => void;
+  onClearRange: (entry: ManualEntryRange) => Promise<void>;
   onConfirm: (entry: ManualTravelEntry) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
@@ -1171,6 +1250,7 @@ function ManualEntryDrawer({
   const [activeDateField, setActiveDateField] = useState<"start" | "end">("start");
   const [countryInput, setCountryInput] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const progress = useSharedValue(visible ? 1 : 0);
   const dragY = useSharedValue(0);
@@ -1182,6 +1262,7 @@ function ManualEntryDrawer({
       setActiveDateField("start");
       setCountryInput("");
       setErrorMessage(null);
+      setIsClearing(false);
       setIsSaving(false);
       setIsRendered(true);
       dragY.value = 0;
@@ -1299,6 +1380,42 @@ function ManualEntryDrawer({
     }
   }
 
+  function requestClearRange() {
+    if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate)) {
+      setErrorMessage("Enter dates as YYYY-MM-DD.");
+      return;
+    }
+
+    if (startDate > endDate) {
+      setErrorMessage("End date must be on or after start date.");
+      return;
+    }
+
+    setErrorMessage(null);
+    Alert.alert(
+      "Clear countries?",
+      `This will remove country history from ${format(parseISO(startDate), "MMM d, yyyy")} to ${format(parseISO(endDate), "MMM d, yyyy")}.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setIsClearing(true);
+              try {
+                await onClearRange({ startDate, endDate });
+              } catch (error) {
+                setIsClearing(false);
+                setErrorMessage(error instanceof Error ? error.message : "Could not clear this date range.");
+              }
+            })();
+          }
+        }
+      ]
+    );
+  }
+
   const manualContent = (
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
       <View style={styles.drawerHeaderRow}>
@@ -1386,8 +1503,9 @@ function ManualEntryDrawer({
       </View>
 
       <View style={styles.drawerActions}>
-        <DrawerActionButton disabled={isSaving} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-        <DrawerActionButton disabled={isSaving} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Inserting" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
+        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.errorFill} borderColor={palette.errorBorder} foregroundColor={palette.errorText} systemImage="trash" title={isClearing ? "Clearing" : "Clear"} style={styles.nativeActionButton} onPress={requestClearRange} />
+        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
+        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Inserting" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
       </View>
     </ScrollView>
   );
@@ -2908,8 +3026,8 @@ const styles = StyleSheet.create({
   },
   nativeCalendarMonthGrid: {
     alignSelf: "center",
-    height: 390,
-    marginTop: 40
+    height: 610,
+    marginTop: 18
   },
   calendarGrid: {
     marginTop: 0
@@ -2987,20 +3105,29 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     width: "100%"
   },
+  dayNumberCircle: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 44,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 44
+  },
   dayNumber: {
     fontFamily: "Inter_400Regular",
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 20,
     textAlign: "center",
-    width: "100%"
+    width: "100%",
+    zIndex: 1
   },
-  flagText: {
-    fontSize: 17,
-    height: 22,
-    lineHeight: 22,
-    marginTop: 5,
+  dayCircleFlagText: {
+    fontSize: 14,
+    height: 16,
+    lineHeight: 16,
     textAlign: "center",
-    width: "100%"
+    width: "100%",
+    zIndex: 1
   },
   spacer: {
     flexGrow: 1,

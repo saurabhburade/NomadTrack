@@ -494,6 +494,19 @@ export async function deleteDayEntry(date: string) {
   });
 }
 
+export async function clearManualEntryRange(entry: { startDate: string; endDate: string }) {
+  const now = new Date().toISOString();
+  const dates = enumerateIsoDates(entry.startDate, entry.endDate);
+
+  await runDbWriteTransaction(async (db) => {
+    for (const date of dates) {
+      await removeManualTripsForDate(db, date, now);
+      await db.runAsync("DELETE FROM day_country_segments WHERE date = ?", date);
+      await db.runAsync("DELETE FROM day_records WHERE date = ?", date);
+    }
+  });
+}
+
 export async function readDayRecordsForMonth(monthStartIso: string) {
   const db = await getDb();
   const start = monthStartIso.slice(0, 8) + "01";

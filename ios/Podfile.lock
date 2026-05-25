@@ -2663,35 +2663,6 @@ PODS:
     - React-perflogger (= 0.81.5)
     - React-utils (= 0.81.5)
     - SocketRocket
-  - RNBackgroundGeolocation (5.1.1):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - TSLocationManager (~> 4.1.0)
-    - Yoga
   - RNGestureHandler (2.28.0):
     - boost
     - DoubleConversion
@@ -3018,9 +2989,6 @@ PODS:
     - SocketRocket
     - Yoga
   - SocketRocket (0.7.1)
-  - TSBackgroundFetch (4.1.1)
-  - TSLocationManager (4.1.7):
-    - TSBackgroundFetch (~> 4.1.0)
   - UMAppLoader (6.0.8)
   - Yoga (0.0.0)
 
@@ -3130,7 +3098,6 @@ DEPENDENCIES:
   - ReactAppDependencyProvider (from `build/generated/ios`)
   - ReactCodegen (from `build/generated/ios`)
   - "ReactCommon/turbomodule/core (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-config@0.85.3_@babel+core@7._03bfb29fbaad688f405e50640065393e/node_modules/react-native/ReactCommon`)"
-  - "RNBackgroundGeolocation (from `../node_modules/.pnpm/react-native-background-geolocation@5.1.1/node_modules/react-native-background-geolocation`)"
   - "RNGestureHandler (from `../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.29.0_@react-nativ_069075bec13e077453125d95a4cd96e1/node_modules/react-native-gesture-handler`)"
   - "RNReanimated (from `../node_modules/.pnpm/react-native-reanimated@4.1.7_react-native-worklets@0.5.1_@babel+core@7.29.0_react-nati_6a6c93f68f4ff792d1dbe9fff6618d6f/node_modules/react-native-reanimated`)"
   - "RNScreens (from `../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-_a8b8b4ae2b81e5e12f49cf68e2c06f70/node_modules/react-native-screens`)"
@@ -3143,8 +3110,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - SocketRocket
-    - TSBackgroundFetch
-    - TSLocationManager
 
 EXTERNAL SOURCES:
   boost:
@@ -3356,8 +3321,6 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@react-native+metro-config@0.85.3_@babel+core@7._03bfb29fbaad688f405e50640065393e/node_modules/react-native/ReactCommon"
-  RNBackgroundGeolocation:
-    :path: "../node_modules/.pnpm/react-native-background-geolocation@5.1.1/node_modules/react-native-background-geolocation"
   RNGestureHandler:
     :path: "../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.29.0_@react-nativ_069075bec13e077453125d95a4cd96e1/node_modules/react-native-gesture-handler"
   RNReanimated:
@@ -3478,15 +3441,12 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 1bcd3527ac0390a1c898c114f81ff954be35ed79
   ReactCodegen: 34611659e7605668ddbf71ab32a3f46fa86986dd
   ReactCommon: 5f0e5c09a64a2717215dd84380e1a747810406f2
-  RNBackgroundGeolocation: 68017f04ca292cfdde26becac33ae801157c91fb
   RNGestureHandler: 3a73f098d74712952870e948b3d9cf7b6cae9961
   RNReanimated: a17f38564cbab44c0fe2d628772e9a948b3e3aec
   RNScreens: 0bbf16c074ae6bb1058a7bf2d1ae017f4306797c
   RNSVG: 6f39605a4c4d200b11435c35bd077553c6b5963a
   RNWorklets: 94e024ba90a670735ffdb82258174159326c7f95
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  TSBackgroundFetch: 18918b6449a1e3f01eb0f5b44d6d79ce6160a5a5
-  TSLocationManager: 0c1b8ed109ae05ea4247def2992b3e4e3f49f839
   UMAppLoader: 145337733539f9af9b3dd97eeaa7f3bd97cacb23
   Yoga: 728df40394d49f3f471688747cf558158b3a3bd1
 

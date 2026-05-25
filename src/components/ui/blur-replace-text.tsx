@@ -18,6 +18,7 @@ export function BlurReplaceText({ animateOnMount = false, containerStyle, number
   const progress = useSharedValue(animateOnMount ? 0 : 1);
   const flattenedStyle = StyleSheet.flatten(style);
   const textAlign = flattenedStyle?.textAlign ?? "center";
+  const textShadowColor = typeof flattenedStyle?.color === "string" ? flattenedStyle.color : "rgba(0, 0, 0, 0.45)";
 
   useEffect(() => {
     if (!animateOnMount) return;
@@ -54,7 +55,13 @@ export function BlurReplaceText({ animateOnMount = false, containerStyle, number
     const blur = interpolate(progress.value, [0, 1], [7, 0]);
 
     return {
-      ...(supportsTextFilter ? { filter: [{ blur }] } : null),
+      ...(supportsTextFilter
+        ? { filter: [{ blur }] }
+        : {
+            textShadowColor,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: blur
+          }),
       opacity: interpolate(progress.value, [0, 0.38, 1], [0, 0.26, 1]),
       transform: [{ scale: interpolate(progress.value, [0, 1], [0.96, 1]) }]
     } as TextStyle;
@@ -64,29 +71,25 @@ export function BlurReplaceText({ animateOnMount = false, containerStyle, number
     const blur = interpolate(progress.value, [0, 1], [0, 7]);
 
     return {
-      ...(supportsTextFilter ? { filter: [{ blur }] } : null),
+      ...(supportsTextFilter
+        ? { filter: [{ blur }] }
+        : {
+            textShadowColor,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: blur
+          }),
       opacity: interpolate(progress.value, [0, 0.72, 1], [1, 0.18, 0]),
       transform: [{ scale: interpolate(progress.value, [0, 1], [1, 0.96]) }]
     } as TextStyle;
   });
 
-  if (!supportsTextFilter) {
-    return (
-      <View pointerEvents="none" style={[styles.stage, containerStyle]}>
-        <RNText {...textProps} numberOfLines={numberOfLines} style={[styles.nativeText, style]}>
-          {currentValue}
-        </RNText>
-      </View>
-    );
-  }
-
   return (
     <View pointerEvents="none" style={[styles.stage, containerStyle]}>
-      <AnimatedText {...textProps} numberOfLines={numberOfLines} style={[style, currentStyle]}>
+      <AnimatedText {...textProps} numberOfLines={numberOfLines} style={[styles.nativeText, style, currentStyle]}>
         {currentValue}
       </AnimatedText>
       {previousValue ? (
-        <AnimatedText {...textProps} numberOfLines={numberOfLines} style={[style, styles.previousText, { textAlign }, previousStyle]}>
+        <AnimatedText {...textProps} numberOfLines={numberOfLines} style={[styles.nativeText, style, styles.previousText, { textAlign }, previousStyle]}>
           {previousValue}
         </AnimatedText>
       ) : null}

@@ -286,6 +286,19 @@ export async function deleteDayEntry(date: string) {
   globalThis.localStorage?.setItem(DAY_RECORDS_KEY, JSON.stringify(records));
 }
 
+export async function clearManualEntryRange(entry: { startDate: string; endDate: string }) {
+  const dates = enumerateIsoDates(entry.startDate, entry.endDate);
+  const dateSet = new Set(dates);
+  let trips = readStoredTrips();
+
+  for (const date of dates) {
+    trips = removeManualTripsForDate(trips, date);
+  }
+
+  globalThis.localStorage?.setItem(TRIPS_KEY, JSON.stringify(trips));
+  globalThis.localStorage?.setItem(DAY_RECORDS_KEY, JSON.stringify(readStoredDayRecords().filter((record) => !dateSet.has(record.date))));
+}
+
 export async function readDayRecordsForMonth(monthStartIso: string) {
   const start = monthStartIso.slice(0, 8) + "01";
   const end = new Date(`${start}T00:00:00.000Z`);
