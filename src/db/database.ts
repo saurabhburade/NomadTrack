@@ -1,12 +1,12 @@
 import * as SQLite from "expo-sqlite";
 import { migrations } from "./migrations";
-import { uuid } from "../lib/utils";
+import { getCurrentLocalYear, uuid } from "../lib/utils";
 import { getResidencyYearWindow } from "../services/calculations/residencyYear";
 import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | undefined;
 let dbWriteQueue: Promise<void> = Promise.resolve();
-const currentYear = new Date().getUTCFullYear();
+const currentYear = getCurrentLocalYear();
 const maxManualEntryDays = 3660;
 const manualTripNotes = ["Manual history entry", "Manual day correction"];
 const sqliteBusyRetryDelaysMs = [80, 160, 320, 640, 1000];

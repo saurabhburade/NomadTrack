@@ -18,6 +18,7 @@ import { syncBackgroundBackupRegistration } from "../services/backup/backgroundB
 import { processGeocodeQueue } from "../services/geocoding/geocodeQueue";
 import { drainPendingShortcutsLocationEvents, startCoreLocationWakeTriggers, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import type { AppSettings, DashboardSummary, LocationPoint, Trip } from "../types/models";
+import { getCurrentLocalIsoDate } from "../lib/utils";
 
 export type DayRecordPreview = {
   date: string;
@@ -50,7 +51,7 @@ type AppState = {
   runGeocodeQueue: () => Promise<void>;
 };
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getCurrentLocalIsoDate();
 const STARTUP_TIMEOUT_MS = 5000;
 let dataLoadSequence = 0;
 

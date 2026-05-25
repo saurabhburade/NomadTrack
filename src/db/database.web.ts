@@ -1,12 +1,12 @@
 import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
-import { uuid } from "../lib/utils";
+import { getCurrentLocalYear, uuid } from "../lib/utils";
 import { getResidencyYearWindow } from "../services/calculations/residencyYear";
 
 const SETTINGS_KEY = "travel-nri-tracker.settings";
 const POINTS_KEY = "travel-nri-tracker.locationPoints";
 const DAY_RECORDS_KEY = "travel-nri-tracker.dayRecords";
 const TRIPS_KEY = "travel-nri-tracker.trips";
-const currentYear = new Date().getUTCFullYear();
+const currentYear = getCurrentLocalYear();
 const maxManualEntryDays = 3660;
 const manualTripNotes = new Set(["Manual history entry", "Manual day correction"]);
 

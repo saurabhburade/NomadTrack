@@ -9,8 +9,9 @@ import { BackupProgressDialog } from "../components/backup/BackupProgressDialog"
 import { NomadTrackLogo } from "../components/brand/NomadTrackLogo";
 import { hasLocalTravelData } from "../db/database";
 import { iconStrokeWidth } from "../lib/colors";
+import { getCurrentLocalIsoDate, getCurrentLocalYear } from "../lib/utils";
 import { listDriveBackups, restoreLatestDriveBackup, type BackupProgress } from "../services/backup/driveBackup";
-import { getGoogleDriveAuthSetup, storeGoogleTokenResponse, useGoogleDriveAuthRequest } from "../services/auth/googleAuth";
+import { getGoogleDriveAuthSetup, storeGoogleAuthResult, useGoogleDriveAuthRequest } from "../services/auth/googleAuth";
 import { useAppStore } from "../store/appStore";
 
 export function OnboardingScreen() {
@@ -35,8 +36,8 @@ export function OnboardingScreen() {
   }, [opacity]);
 
   useEffect(() => {
-    if (response?.type === "success" && response.authentication?.accessToken) {
-      void storeGoogleTokenResponse(response.authentication)
+    if (response?.type === "success") {
+      void storeGoogleAuthResult(response, googleAuthRequest)
         .then(() => checkForRestorableBackup())
         .catch((error) => {
           Alert.alert("Google login failed", error instanceof Error ? error.message : "Could not connect Google Drive.");
@@ -45,12 +46,14 @@ export function OnboardingScreen() {
       return;
     }
 
-    if (response && response.type !== "success") {
+    if (response) {
       setIsSigningIn(false);
     }
   }, [response]);
 
   async function finishOnboarding() {
+    await updateSetting("residencyYearEnd", getCurrentLocalYear());
+    await setSelectedDate(getCurrentLocalIsoDate());
     await updateSetting("onboardingCompleted", true);
     await refresh();
   }
@@ -89,8 +92,7 @@ export function OnboardingScreen() {
     setRestoreMessage("Restoring your Google Drive backup...");
 
     try {
-      const result = await restoreLatestDriveBackup({ onProgress: setBackupProgress });
-      await setSelectedDate(result.displayDate);
+      await restoreLatestDriveBackup({ onProgress: setBackupProgress });
       await finishOnboarding();
     } catch (error) {
       setRestoreState("available");

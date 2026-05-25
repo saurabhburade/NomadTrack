@@ -30,13 +30,14 @@ import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
 import { YearSelectorDrawer, getFiscalYearLabel, type YearSelectorPalette } from "../components/year-selector-drawer";
 import { clearAllLocalData } from "../db/database";
 import { getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
+import { getCurrentLocalIsoDate, getCurrentLocalYear } from "../lib/utils";
 import {
   clearGoogleAccessToken,
   getGoogleAccountProfile,
   getGoogleDriveAuthSetup,
   getGoogleDriveConnectionState,
   GoogleLoginRequiredError,
-  storeGoogleTokenResponse,
+  storeGoogleAuthResult,
   useGoogleDriveAuthRequest
 } from "../services/auth/googleAuth";
 import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile, type BackupProgress } from "../services/backup/driveBackup";
@@ -106,8 +107,8 @@ export function SettingsScreen() {
   });
 
   useEffect(() => {
-    if (response?.type === "success" && response.authentication?.accessToken) {
-      void storeGoogleTokenResponse(response.authentication)
+    if (response?.type === "success") {
+      void storeGoogleAuthResult(response, googleAuthRequest)
         .then(() => refreshGoogleConnectionState())
         .then(() => setBackupStatus({ tone: "success", message: "Google Drive connected." }))
         .catch((error) => {
@@ -274,7 +275,8 @@ export function SettingsScreen() {
             : `Restore finished, but this backup only contained settings. No travel history was found in the ${backupLabel} backup.`
       });
       await refreshGoogleConnectionState();
-      await setSelectedDate(result.displayDate);
+      await updateSetting("residencyYearEnd", getCurrentLocalYear());
+      await setSelectedDate(getCurrentLocalIsoDate());
       await refresh();
     } catch (error) {
       handleBackupError(error, "Restore failed.");
@@ -342,7 +344,7 @@ export function SettingsScreen() {
     await clearAllLocalData();
     setBackupStatus({ tone: "success", message: successMessage });
     setGoogleConnection(defaultGoogleConnection);
-    await setSelectedDate(new Date().toISOString().slice(0, 10));
+    await setSelectedDate(getCurrentLocalIsoDate());
     await refresh();
   }
 

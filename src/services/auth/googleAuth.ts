@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { TokenResponse, type TokenResponseConfig } from "expo-auth-session";
+import { exchangeCodeAsync, TokenResponse, type AuthRequest, type AuthSessionResult, type TokenResponseConfig } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
@@ -15,6 +15,8 @@ export type GoogleAccountProfile = {
   name?: string;
   picture?: string;
 };
+
+type GoogleAuthCodeRequest = Pick<AuthRequest, "clientId" | "clientSecret" | "codeVerifier" | "redirectUri" | "scopes">;
 
 export class GoogleLoginRequiredError extends Error {
   constructor(message = "Please log in with Google. Backup won't work unless Google Drive is connected.") {
@@ -66,6 +68,7 @@ export function useGoogleDriveAuthRequest() {
       androidClientId: extra.googleAndroidClientId as string | undefined,
       webClientId: extra.googleWebClientId as string | undefined,
       scopes: googleDriveScopes,
+      shouldAutoExchangeCode: false,
       extraParams: {
         access_type: "offline",
         include_granted_scopes: "true",
@@ -74,6 +77,42 @@ export function useGoogleDriveAuthRequest() {
     },
     nativeRedirectUri ? { native: nativeRedirectUri } : undefined
   );
+}
+
+export async function storeGoogleAuthResult(response: AuthSessionResult, request: GoogleAuthCodeRequest | null) {
+  if (response.type !== "success") {
+    throw new GoogleLoginRequiredError(getAuthSessionFailureMessage(response));
+  }
+
+  if (response.authentication) {
+    await storeGoogleTokenResponse(response.authentication);
+    return;
+  }
+
+  const code = typeof response.params.code === "string" ? response.params.code : undefined;
+  if (!code || !request) {
+    throw new GoogleLoginRequiredError("Google sign-in did not return an authorization code. Please try again.");
+  }
+
+  try {
+    const tokenResponse = await exchangeCodeAsync(
+      {
+        clientId: request.clientId,
+        clientSecret: request.clientSecret,
+        code,
+        redirectUri: request.redirectUri,
+        scopes: request.scopes,
+        extraParams: {
+          code_verifier: request.codeVerifier || ""
+        }
+      },
+      Google.discovery
+    );
+    await storeGoogleTokenResponse(tokenResponse);
+  } catch (error) {
+    await clearGoogleAccessToken();
+    throw new GoogleLoginRequiredError(getGoogleTokenExchangeFailureMessage(error));
+  }
 }
 
 export async function storeGoogleTokenResponse(tokenResponse: TokenResponse) {
@@ -169,6 +208,22 @@ export async function getGoogleDriveConnectionState() {
 
 export function assertGoogleAccessToken(accessToken: string | null): asserts accessToken is string {
   if (!accessToken) throw new GoogleLoginRequiredError();
+}
+
+function getAuthSessionFailureMessage(response: AuthSessionResult) {
+  if (response.type === "dismiss" || response.type === "cancel") return "Google sign-in was cancelled.";
+  if (response.type === "error") {
+    return response.error?.message || "Google sign-in failed. Please try again.";
+  }
+  return "Google sign-in failed. Please try again.";
+}
+
+function getGoogleTokenExchangeFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.toLowerCase().includes("invalid") || message.toLowerCase().includes("grant")) {
+    return "Google sign-in expired or was rejected. Please try again.";
+  }
+  return message || "Google sign-in failed. Please try again.";
 }
 
 function getGoogleDriveClientId() {

@@ -113,26 +113,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
-    minHeight: 32
+    minHeight: 30
   },
   itemIcon: {
     alignItems: "center",
-    height: 22,
+    height: 24,
     justifyContent: "center",
-    width: 22
+    width: 24
   },
   itemLabel: {
     flex: 1,
     fontSize: 14,
+    includeFontPadding: false,
     letterSpacing: 0,
     lineHeight: 20,
-    textAlign: "left"
+    textAlign: "left",
+    textAlignVertical: "center"
   },
   itemLabelStage: {
     alignItems: "flex-start",
     flex: 1,
     justifyContent: "center",
-    minHeight: 32,
+    minHeight: 24,
     minWidth: 0
   },
   items: {

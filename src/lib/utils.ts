@@ -14,6 +14,15 @@ export function toIsoDate(value: Date | string) {
   return date.toISOString().slice(0, 10);
 }
 
+export function getCurrentLocalIsoDate(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+export function getCurrentLocalYear(date = new Date()) {
+  return Number(getCurrentLocalIsoDate(date).slice(0, 4));
+}
+
 export function formatRelativeTime(iso?: string) {
   if (!iso) return "Never";
   const diffMs = Date.now() - new Date(iso).getTime();
