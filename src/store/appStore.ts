@@ -16,7 +16,7 @@ import {
 } from "../db/database";
 import { syncBackgroundBackupRegistration } from "../services/backup/backgroundBackupTask";
 import { processGeocodeQueue } from "../services/geocoding/geocodeQueue";
-import { drainPendingShortcutsLocationEvents, startCoreLocationWakeTriggers, stopBackgroundTracking } from "../services/tracking/locationTracking";
+import { drainPendingShortcutsLocationEvents, resumeBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import type { AppSettings, DashboardSummary, LocationPoint, Trip } from "../types/models";
 import { getCurrentLocalIsoDate } from "../lib/utils";
 
@@ -106,7 +106,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await syncBackgroundBackupRegistration(settings);
       await drainPendingShortcutsLocationEvents();
       if (!settings.trackingPaused && settings.trackingInterval !== "manual") {
-        await startCoreLocationWakeTriggers({ backupPendingEvents: false, backupShortcutsEvents: true });
+        await resumeBackgroundTracking(settings.trackingInterval, { backupPendingEvents: false, backupShortcutsEvents: true });
       } else {
         await stopBackgroundTracking();
       }

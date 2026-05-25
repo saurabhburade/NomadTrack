@@ -110,7 +110,21 @@ export async function startBackgroundTracking(interval: TrackingIntervalHours) {
   const hasPermission = await requestTrackingPermissions();
   if (!hasPermission) return false;
 
-  await startCoreLocationWakeTriggers();
+  await registerBackgroundLocationTask(interval);
+  return true;
+}
+
+export async function resumeBackgroundTracking(interval: TrackingIntervalHours, options: CoreLocationWakeTriggerOptions = {}) {
+  if (interval === "manual") return stopBackgroundTracking();
+  const hasPermission = await hasBackgroundTrackingPermission();
+  if (!hasPermission) return false;
+
+  await registerBackgroundLocationTask(interval, options);
+  return true;
+}
+
+async function registerBackgroundLocationTask(interval: Exclude<TrackingIntervalHours, "manual">, options: CoreLocationWakeTriggerOptions = {}) {
+  await startCoreLocationWakeTriggers(options);
 
   const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
   if (isRegistered) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
@@ -132,7 +146,6 @@ export async function startBackgroundTracking(interval: TrackingIntervalHours) {
       : {}),
     showsBackgroundLocationIndicator: true
   });
-  return true;
 }
 
 function getTrackingIntervalMs(interval: Exclude<TrackingIntervalHours, "manual">) {
