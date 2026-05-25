@@ -11,6 +11,7 @@
 		1F497C1C2ED16D6A8C447571 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F893A67DEAEBE40E62BE1800 /* PrivacyInfo.xcprivacy */; };
 		AC921DFAA222F54D77ADA720 /* libPods-TravelNRITracker.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ED9838B776239018FC6246CF /* libPods-TravelNRITracker.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		C0DEF038C0DEF038C0DEF038 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C0DEF039C0DEF039C0DEF039 /* LaunchScreen.storyboard */; };
 		C0DEF001C0DEF001C0DEF001 /* ForceQuitLocationModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF003C0DEF003C0DEF003 /* ForceQuitLocationModule.swift */; };
 		C0DEF002C0DEF002C0DEF002 /* ForceQuitLocationModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF004C0DEF004C0DEF004 /* ForceQuitLocationModuleBridge.m */; };
 		C0DEF005C0DEF005C0DEF005 /* LogTodayCountryIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF006C0DEF006C0DEF006 /* LogTodayCountryIntent.swift */; };
@@ -44,6 +45,7 @@
 		13B07F961A680F5B00A75B9A /* TravelNRITracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TravelNRITracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = TravelNRITracker/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = TravelNRITracker/Info.plist; sourceTree = "<group>"; };
+		C0DEF039C0DEF039C0DEF039 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = TravelNRITracker/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		2AE5ECB4E8AC4711BB37D064 /* Pods-TravelNRITracker.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TravelNRITracker.debug.xcconfig"; path = "Target Support Files/Pods-TravelNRITracker/Pods-TravelNRITracker.debug.xcconfig"; sourceTree = "<group>"; };
 		5C53743FEC5B0AE65FD7D662 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-TravelNRITracker/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		6D85A0DB2C44FCA18E18FD4B /* Pods-TravelNRITracker.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TravelNRITracker.release.xcconfig"; path = "Target Support Files/Pods-TravelNRITracker/Pods-TravelNRITracker.release.xcconfig"; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
+				C0DEF039C0DEF039C0DEF039 /* LaunchScreen.storyboard */,
 				F893A67DEAEBE40E62BE1800 /* PrivacyInfo.xcprivacy */,
 			);
 			name = TravelNRITracker;
@@ -267,6 +270,7 @@
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				C0DEF038C0DEF038C0DEF038 /* LaunchScreen.storyboard in Resources */,
 				1F497C1C2ED16D6A8C447571 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
