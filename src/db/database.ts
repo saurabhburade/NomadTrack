@@ -194,9 +194,17 @@ export async function enqueueGeocodeJob(point: Pick<LocationPoint, "id" | "latit
 export async function getPendingGeocodeJobs(limit = 25) {
   const db = await getDb();
   return db.getAllAsync<PendingGeocodeJobRow>(
-    `SELECT * FROM pending_geocode_jobs
-     WHERE status IN ('pending', 'failed')
-     ORDER BY retry_count ASC, timestamp ASC
+    `SELECT
+       pending_geocode_jobs.*,
+       location_points.accuracy as location_accuracy,
+       location_points.country_code as location_country_code,
+       location_points.country_name as location_country_name,
+       location_points.reverse_geocode_status as location_reverse_geocode_status
+     FROM pending_geocode_jobs
+     INNER JOIN location_points
+       ON location_points.id = pending_geocode_jobs.location_point_id
+     WHERE pending_geocode_jobs.status IN ('pending', 'failed')
+     ORDER BY pending_geocode_jobs.retry_count ASC, pending_geocode_jobs.timestamp ASC
      LIMIT ?`,
     limit
   );
@@ -257,7 +265,12 @@ export async function readDashboardSummary(): Promise<DashboardSummary> {
     window.endDate
   );
   const pending = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM pending_geocode_jobs WHERE status IN ('pending', 'failed')"
+    `SELECT COUNT(*) as count
+     FROM pending_geocode_jobs
+     INNER JOIN location_points
+       ON location_points.id = pending_geocode_jobs.location_point_id
+     WHERE pending_geocode_jobs.status IN ('pending', 'failed')
+       AND location_points.reverse_geocode_status != 'done'`
   );
   const backup = await db.getFirstAsync<{ lastBackupAt: string }>(
     "SELECT last_backup_at as lastBackupAt FROM backup_metadata ORDER BY last_backup_at DESC LIMIT 1"
@@ -622,6 +635,10 @@ type PendingGeocodeJobRow = {
   retry_count: number;
   last_attempt_at: string | null;
   error: string | null;
+  location_accuracy: number | null;
+  location_country_code: string | null;
+  location_country_name: string | null;
+  location_reverse_geocode_status: LocationPoint["reverseGeocodeStatus"];
   created_at: string;
   updated_at: string;
 };

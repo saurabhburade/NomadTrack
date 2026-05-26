@@ -22,19 +22,36 @@ type ReverseGeocodeResult = {
 const backoffMinutes = [5, 30, 120, 720, 1440];
 const legacyMissingEndpointError = "Reverse geocoding endpoint is not configured";
 const reverseGeocodeTimeoutMs = 60 * 1000;
+const nativeDisagreementAccuracyThresholdMeters = 5000;
 
 export async function processGeocodeQueue() {
   const network = await Network.getNetworkStateAsync();
   const jobs = await getPendingGeocodeJobs();
   let processed = 0;
   for (const job of jobs) {
-    if (!isRetryDue(job.retry_count, job.last_attempt_at ?? undefined, job.error ?? undefined)) continue;
     try {
-      if (!network.isInternetReachable) {
-        const fallback = resolveCountryFromBoundaries(job.latitude, job.longitude);
-        if (!fallback) continue;
-        await completeGeocodeJob(job, fallback);
+      const hasLocalCountry =
+        job.location_reverse_geocode_status === "done" && Boolean(job.location_country_code && job.location_country_name);
+      if (hasLocalCountry) {
+        if (!isRetryDue(job.retry_count, job.last_attempt_at ?? undefined, job.error ?? undefined)) continue;
+        if (!network.isInternetReachable) continue;
+
+        await updateGeocodeJob(job.id, "processing", job.retry_count);
+        const nativeResult = await reverseGeocode(job.latitude, job.longitude);
+        await completeGeocodeJob(job, chooseNativeConfirmationResult(job, nativeResult));
         processed += 1;
+        continue;
+      }
+
+      const localCountry = resolveCountryFromBoundaries(job.latitude, job.longitude);
+      if (localCountry) {
+        await completeGeocodeJob(job, localCountry);
+        processed += 1;
+        continue;
+      }
+
+      if (!isRetryDue(job.retry_count, job.last_attempt_at ?? undefined, job.error ?? undefined)) continue;
+      if (!network.isInternetReachable) {
         continue;
       }
 
@@ -48,6 +65,34 @@ export async function processGeocodeQueue() {
   }
 
   return { processed, skipped: !network.isInternetReachable };
+}
+
+function chooseNativeConfirmationResult(
+  job: {
+    location_accuracy: number | null;
+    location_country_code: string | null;
+    location_country_name: string | null;
+  },
+  nativeResult: ReverseGeocodeResult
+): ReverseGeocodeResult {
+  if (!job.location_country_code || !job.location_country_name) return nativeResult;
+  if (nativeResult.countryCode === job.location_country_code) return nativeResult;
+
+  if ((job.location_accuracy ?? Number.POSITIVE_INFINITY) > nativeDisagreementAccuracyThresholdMeters) {
+    console.warn(
+      `[geocode] Native country ${nativeResult.countryCode} disagreed with local boundary ${job.location_country_code}; keeping local country because GPS accuracy was poor.`
+    );
+    return {
+      countryCode: job.location_country_code,
+      countryName: job.location_country_name,
+      timezone: nativeResult.timezone
+    };
+  }
+
+  console.warn(
+    `[geocode] Native country ${nativeResult.countryCode} disagreed with local boundary ${job.location_country_code}; using native result.`
+  );
+  return nativeResult;
 }
 
 async function completeGeocodeJob(

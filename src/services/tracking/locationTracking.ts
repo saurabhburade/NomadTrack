@@ -7,6 +7,7 @@ import { enqueueGeocodeJob, insertLocationPoint, readLocationPointsForDate, read
 import { toIsoDate, uuid } from "../../lib/utils";
 import { runAutoBackupIfDue } from "../backup/driveBackup";
 import { recalculateDayForPoints } from "../calculations/dayAssignment";
+import { resolveCountryFromBoundaries } from "../geocoding/countryBoundaryLookup";
 import { processGeocodeQueue } from "../geocoding/geocodeQueue";
 import { showStatusNotification } from "../notifications/statusNotifications";
 import type { LocationSource, TrackingIntervalHours } from "../../types/models";
@@ -192,6 +193,7 @@ async function persistLocation(location: PersistableLocation, requestedSource: L
   const network = await Network.getNetworkStateAsync();
   const source = network.isInternetReachable || requestedSource !== "gps" ? requestedSource : "gps_offline";
   const timestamp = typeof location.timestamp === "string" ? location.timestamp : new Date(location.timestamp).toISOString();
+  const localCountry = resolveCountryFromBoundaries(location.coords.latitude, location.coords.longitude);
   const point = {
     id: uuid("loc"),
     timestamp,
@@ -202,13 +204,21 @@ async function persistLocation(location: PersistableLocation, requestedSource: L
     speed: location.coords.speed ?? undefined,
     heading: location.coords.heading ?? undefined,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    countryCode: localCountry?.countryCode,
+    countryName: localCountry?.countryName,
     source,
-    reverseGeocodeStatus: network.isInternetReachable ? "pending" : "pending"
+    reverseGeocodeStatus: localCountry ? "done" : "pending"
   } as const;
 
   await insertLocationPoint(point);
   await enqueueGeocodeJob(point);
-  await processGeocodeQueue();
+  if (localCountry) {
+    void processGeocodeQueue().catch((error) => {
+      console.warn(`[geocode] Native confirmation failed: ${getErrorMessage(error)}`);
+    });
+  } else {
+    await processGeocodeQueue();
+  }
 
   const settings = await readSettings();
   const dayPoints = await readLocationPointsForDate(toIsoDate(point.timestamp));

@@ -72,6 +72,7 @@ export function DashboardScreen() {
   );
 
   useEffect(() => {
+    void runGeocodeQueue().catch(() => undefined);
     const timer = setInterval(() => {
       void runGeocodeQueue().catch(() => undefined);
     }, 60_000);
