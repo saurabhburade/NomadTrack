@@ -11,7 +11,7 @@
     "start:dev-client": "expo start --dev-client --scheme exp+travel-nri-tracker",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "ios:release": "expo run:ios --device --configuration Release",
+    "ios:release": "node scripts/ios-release-with-provisioning.mjs",
     "typecheck": "tsc --noEmit",
     "audit": "pnpm audit --audit-level moderate",
     "security:lock": "pnpm install --lockfile-only --ignore-scripts && pnpm audit --audit-level moderate"
