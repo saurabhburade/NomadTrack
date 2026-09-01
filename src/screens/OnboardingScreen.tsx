@@ -1,17 +1,17 @@
+import { ChevronRight } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
-import { ChevronRight } from "lucide-react-native";
-import { Button } from "../components/ui/button";
-import { Text } from "../components/ui/text";
 import { BackupProgressDialog } from "../components/backup/BackupProgressDialog";
 import { NomadTrackLogo } from "../components/brand/NomadTrackLogo";
+import { Button } from "../components/ui/button";
+import { Text } from "../components/ui/text";
 import { hasLocalTravelData } from "../db/database";
 import { iconStrokeWidth } from "../lib/colors";
 import { getCurrentLocalIsoDate, getCurrentLocalYear } from "../lib/utils";
-import { listDriveBackups, restoreLatestDriveBackup, type BackupProgress } from "../services/backup/driveBackup";
 import { getGoogleDriveAuthSetup, storeGoogleAuthResult, useGoogleDriveAuthRequest } from "../services/auth/googleAuth";
+import { type BackupProgress, listDriveBackups, restoreLatestDriveBackup } from "../services/backup/driveBackup";
 import { useAppStore } from "../store/appStore";
 
 export function OnboardingScreen() {
@@ -153,11 +153,7 @@ export function OnboardingScreen() {
                   onPress={handleGetStarted}
                 >
                   <Text className="text-sm font-bold text-white">{getPrimaryButtonLabel(isSigningIn, restoreState)}</Text>
-                  {primaryButtonBusy ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ChevronRight size={25} color="#fff" strokeWidth={iconStrokeWidth} />
-                  )}
+                  {primaryButtonBusy ? <ActivityIndicator color="#fff" size="small" /> : <ChevronRight size={25} color="#fff" strokeWidth={iconStrokeWidth} />}
                 </Button>
               ) : null}
               {restoreState === "available" ? (
@@ -177,11 +173,7 @@ export function OnboardingScreen() {
           </View>
         </SafeAreaView>
       </Animated.View>
-      <BackupProgressDialog
-        palette={onboardingBackupProgressPalette}
-        progress={backupProgress}
-        visible={Boolean(backupProgress)}
-      />
+      <BackupProgressDialog palette={onboardingBackupProgressPalette} progress={backupProgress} visible={Boolean(backupProgress)} />
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, type ViewStyle } from "react-native";
 
 type NativeGlassButtonProps = {
   accessibilityLabel: string;
@@ -13,7 +13,18 @@ type NativeGlassButtonProps = {
   onPress: () => void;
 };
 
-export function NativeGlassButton({ accessibilityLabel, color, disabled = false, fontSize = 17, fontWeight = "semibold", shape = "capsule", style, systemImage, title, onPress }: NativeGlassButtonProps) {
+export function NativeGlassButton({
+  accessibilityLabel,
+  color,
+  disabled = false,
+  fontSize = 17,
+  fontWeight = "semibold",
+  shape = "capsule",
+  style,
+  systemImage,
+  title,
+  onPress
+}: NativeGlassButtonProps) {
   const tint = String(color ?? "#111111");
   const label = title || fallbackSymbol(systemImage);
 
@@ -26,9 +37,7 @@ export function NativeGlassButton({ accessibilityLabel, color, disabled = false,
       style={[styles.button, shape === "circle" && styles.circle, shape === "roundedRectangle" && styles.roundedRectangle, disabled && styles.disabled, style]}
       onPress={onPress}
     >
-      <Text style={[styles.label, { color: tint, fontSize, fontWeight: fallbackFontWeight(fontWeight) }]}>
-        {label}
-      </Text>
+      <Text style={[styles.label, { color: tint, fontSize, fontWeight: fallbackFontWeight(fontWeight) }]}>{label}</Text>
     </Pressable>
   );
 }

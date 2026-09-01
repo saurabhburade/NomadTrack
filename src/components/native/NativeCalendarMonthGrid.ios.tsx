@@ -1,16 +1,5 @@
-import {
-  requireNativeComponent,
-  UIManager,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
-import type {
-  NativeCalendarMonthGridDayRecord,
-  NativeCalendarMonthGridPalette,
-  NativeCalendarMonthGridSummary
-} from "./NativeCalendarMonthGrid";
+import { type NativeSyntheticEvent, requireNativeComponent, type StyleProp, UIManager, type ViewProps, type ViewStyle } from "react-native";
+import type { NativeCalendarMonthGridDayRecord, NativeCalendarMonthGridPalette, NativeCalendarMonthGridSummary } from "./NativeCalendarMonthGrid";
 
 type DayPressEvent = NativeSyntheticEvent<{
   date: string;
@@ -53,17 +42,12 @@ type NativeCalendarMonthGridProps = {
   onPreviousMonth: () => void;
 };
 
-const calendarMonthGridViewConfig = UIManager.getViewManagerConfig?.("CalendarMonthGridView") as
-  | { NativeProps?: Record<string, unknown> }
-  | null
-  | undefined;
+const calendarMonthGridViewConfig = UIManager.getViewManagerConfig?.("CalendarMonthGridView") as { NativeProps?: Record<string, unknown> } | null | undefined;
 
 export const isNativeCalendarMonthGridAvailable = calendarMonthGridViewConfig != null;
 export const isNativeCalendarMonthGridSummaryAvailable = calendarMonthGridViewConfig?.NativeProps?.showsSummary != null;
 
-const CalendarMonthGridView = isNativeCalendarMonthGridAvailable
-  ? requireNativeComponent<CalendarMonthGridViewProps>("CalendarMonthGridView")
-  : null;
+const CalendarMonthGridView = isNativeCalendarMonthGridAvailable ? requireNativeComponent<CalendarMonthGridViewProps>("CalendarMonthGridView") : null;
 
 export function NativeCalendarMonthGrid({
   dayRecords,

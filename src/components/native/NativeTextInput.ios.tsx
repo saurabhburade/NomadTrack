@@ -1,5 +1,5 @@
 import { Host, TextField, type TextFieldKeyboardType } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativeTextInputProps = {
   defaultValue?: string;

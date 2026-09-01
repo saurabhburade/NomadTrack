@@ -20,9 +20,28 @@
 # production
 /build
 
+# Expo and platform build output
+.expo/
+.expo-shared/
+.xcode-derived/
+ios/build/
+android/build/
+android/app/build/
+android/.gradle/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
 # misc
 .DS_Store
+*.cer
+*.der
+*.key
 *.pem
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
 
 # debug
 npm-debug.log*
@@ -33,6 +52,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env
 .env*
+!.env.example
+!.env.sample
+!.env.template
 # vercel
 .vercel
 
@@ -43,4 +65,9 @@ next-env.d.ts
 certificates
 *storybook.log
 storybook-static
-.xcode-derived
+
+# Local security reports and scanner output
+audit-report*.json
+security-report*.json
+gitleaks-report*.json
+trufflehog-report*.json

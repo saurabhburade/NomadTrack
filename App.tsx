@@ -1,17 +1,17 @@
 import "react-native-gesture-handler";
 import "./global.css";
 
+import { useFonts } from "expo-font";
+import { StatusBar } from "expo-status-bar";
+import { colorScheme as nativeWindColorScheme } from "nativewind";
 import { useEffect } from "react";
 import { useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
-import { colorScheme as nativeWindColorScheme } from "nativewind";
+import { getNeutralPalette } from "./src/lib/colors";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { useAppStore } from "./src/store/appStore";
-import { getNeutralPalette } from "./src/lib/colors";
 
 export default function App() {
   const { initialize, isReady, settings } = useAppStore();

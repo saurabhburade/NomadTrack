@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { useColorScheme, View } from "react-native";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
 import { colorScheme as nativeWindColorScheme } from "nativewind";
+import { useEffect } from "react";
+import { useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getNeutralPalette } from "../lib/colors";

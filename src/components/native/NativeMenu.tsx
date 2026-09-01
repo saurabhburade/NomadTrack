@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 export type NativeMenuAction = {
   role?: "default" | "cancel" | "destructive";
@@ -21,7 +21,12 @@ type NativeMenuProps = {
 
 export function NativeMenu({ accessibilityLabel, actions, color, frame, style, title }: NativeMenuProps) {
   return (
-    <Pressable accessibilityLabel={accessibilityLabel ?? title} accessibilityRole="button" style={[styles.button, frame, style]} onPress={() => actions[0]?.onPress()}>
+    <Pressable
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityRole="button"
+      style={[styles.button, frame, style]}
+      onPress={() => actions[0]?.onPress()}
+    >
       <View style={styles.content}>
         <Text style={[styles.label, { color: String(color ?? "#111111") }]}>{title ?? "Menu"}</Text>
       </View>

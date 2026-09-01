@@ -1,7 +1,7 @@
-import { Button as SwiftButton, Host, HStack, Image, Spacer, Text } from "@expo/ui/swift-ui";
 import type { ButtonProps as SwiftButtonProps } from "@expo/ui/swift-ui";
+import { Host, HStack, Image, Spacer, Button as SwiftButton, Text } from "@expo/ui/swift-ui";
 import { frame as swiftFrame } from "@expo/ui/swift-ui/modifiers";
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativeButtonProps = {
   accessibilityLabel?: string;
@@ -19,7 +19,21 @@ type NativeButtonProps = {
   onPress?: () => void;
 };
 
-export function NativeButton({ accessibilityLabel, color, controlSize = "large", disabled, foregroundColor, frame, fullWidth, role = "default", style, systemImage, title, variant = "bordered", onPress }: NativeButtonProps) {
+export function NativeButton({
+  accessibilityLabel,
+  color,
+  controlSize = "large",
+  disabled,
+  foregroundColor,
+  frame,
+  fullWidth,
+  role = "default",
+  style,
+  systemImage,
+  title,
+  variant = "bordered",
+  onPress
+}: NativeButtonProps) {
   const fixedFrame = frame
     ? {
         ...frame,

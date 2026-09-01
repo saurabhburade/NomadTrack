@@ -1,14 +1,8 @@
 import * as Location from "expo-location";
 import * as Network from "expo-network";
-import {
-  getPendingGeocodeJobs,
-  readLocationPointsForDate,
-  readSettings,
-  updateGeocodeJob,
-  updateLocationGeocode
-} from "../../db/database";
-import { recalculateDayForPoints } from "../calculations/dayAssignment";
+import { getPendingGeocodeJobs, readLocationPointsForDate, readSettings, updateGeocodeJob, updateLocationGeocode } from "../../db/database";
 import { toIsoDate } from "../../lib/utils";
+import { recalculateDayForPoints } from "../calculations/dayAssignment";
 import { resolveCountryFromBoundaries } from "./countryBoundaryLookup";
 
 type ReverseGeocodeResult = {
@@ -30,8 +24,7 @@ export async function processGeocodeQueue() {
   let processed = 0;
   for (const job of jobs) {
     try {
-      const hasLocalCountry =
-        job.location_reverse_geocode_status === "done" && Boolean(job.location_country_code && job.location_country_name);
+      const hasLocalCountry = job.location_reverse_geocode_status === "done" && Boolean(job.location_country_code && job.location_country_name);
       if (hasLocalCountry) {
         if (!isRetryDue(job.retry_count, job.last_attempt_at ?? undefined, job.error ?? undefined)) continue;
         if (!network.isInternetReachable) continue;
@@ -89,9 +82,7 @@ function chooseNativeConfirmationResult(
     };
   }
 
-  console.warn(
-    `[geocode] Native country ${nativeResult.countryCode} disagreed with local boundary ${job.location_country_code}; using native result.`
-  );
+  console.warn(`[geocode] Native country ${nativeResult.countryCode} disagreed with local boundary ${job.location_country_code}; using native result.`);
   return nativeResult;
 }
 
@@ -132,11 +123,7 @@ async function reverseGeocodeWithBoundaryFallback(latitude: number, longitude: n
 }
 
 async function reverseGeocode(latitude: number, longitude: number): Promise<ReverseGeocodeResult> {
-  const [address] = await withTimeout(
-    "Reverse geocoding",
-    Location.reverseGeocodeAsync({ latitude, longitude }),
-    reverseGeocodeTimeoutMs
-  );
+  const [address] = await withTimeout("Reverse geocoding", Location.reverseGeocodeAsync({ latitude, longitude }), reverseGeocodeTimeoutMs);
   if (!address) throw new Error("Reverse geocoding returned no address");
 
   const countryCode = address.isoCountryCode?.trim().toUpperCase();

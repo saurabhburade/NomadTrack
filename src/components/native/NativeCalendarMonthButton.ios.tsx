@@ -1,5 +1,17 @@
-import { Pressable, requireNativeComponent, StyleSheet, Text, UIManager, View, type ColorValue, type NativeSyntheticEvent, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 import { ChevronRight } from "lucide-react-native";
+import {
+  type ColorValue,
+  type NativeSyntheticEvent,
+  Pressable,
+  requireNativeComponent,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+  type ViewProps,
+  type ViewStyle
+} from "react-native";
 import { iconStrokeWidth } from "../../lib/colors";
 
 type NativeCalendarMonthButtonProps = {

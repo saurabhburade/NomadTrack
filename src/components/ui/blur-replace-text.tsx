@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Platform, StyleSheet, Text as RNText, View, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from "react-native";
-import Animated, { Easing as ReanimatedEasing, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Platform, Text as RNText, type StyleProp, StyleSheet, type TextProps, type TextStyle, View, type ViewStyle } from "react-native";
+import Animated, { interpolate, Easing as ReanimatedEasing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 const AnimatedText = Animated.createAnimatedComponent(RNText);
 const supportsTextFilter = Platform.OS === "web";

@@ -1,8 +1,8 @@
 import * as SQLite from "expo-sqlite";
-import { migrations } from "./migrations";
 import { getCurrentLocalYear, uuid } from "../lib/utils";
 import { getResidencyYearWindow } from "../services/calculations/residencyYear";
 import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
+import { migrations } from "./migrations";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | undefined;
 let dbWriteQueue: Promise<void> = Promise.resolve();
@@ -142,11 +142,7 @@ export async function insertLocationPoint(point: Omit<LocationPoint, "createdAt"
   const now = new Date().toISOString();
   const date = point.timestamp.slice(0, 10);
   await runDbWriteTransaction(async (db) => {
-    await db.runAsync(
-      "DELETE FROM location_points WHERE timestamp >= ? AND timestamp <= ?",
-      `${date}T00:00:00.000Z`,
-      `${date}T23:59:59.999Z`
-    );
+    await db.runAsync("DELETE FROM location_points WHERE timestamp >= ? AND timestamp <= ?", `${date}T00:00:00.000Z`, `${date}T23:59:59.999Z`);
     await db.runAsync(
       `INSERT INTO location_points (
         id, timestamp, latitude, longitude, accuracy, altitude, speed, heading, timezone,
@@ -225,10 +221,7 @@ export async function updateGeocodeJob(id: string, status: string, retryCount: n
   });
 }
 
-export async function updateLocationGeocode(
-  id: string,
-  result: Pick<LocationPoint, "countryCode" | "countryName" | "region" | "city" | "timezone">
-) {
+export async function updateLocationGeocode(id: string, result: Pick<LocationPoint, "countryCode" | "countryName" | "region" | "city" | "timezone">) {
   await runDbWriteTransaction(async (db) => {
     await db.runAsync(
       `UPDATE location_points SET
@@ -250,9 +243,7 @@ export async function readDashboardSummary(): Promise<DashboardSummary> {
   const db = await getDb();
   const settings = await readSettings();
   const window = getResidencyYearWindow(settings, currentYear);
-  const currentLocation = await db.getFirstAsync<LocationPointRow>(
-    "SELECT * FROM location_points ORDER BY timestamp DESC LIMIT 1"
-  );
+  const currentLocation = await db.getFirstAsync<LocationPointRow>("SELECT * FROM location_points ORDER BY timestamp DESC LIMIT 1");
   const countryTotals = await db.getAllAsync<{ countryCode: string; countryName: string; days: number }>(
     `SELECT primary_country_code as countryCode, primary_country_name as countryName, COUNT(*) as days
      FROM day_records
@@ -322,20 +313,12 @@ export async function readDayRecordsForDashboardYear() {
   const db = await getDb();
   const settings = await readSettings();
   const window = getResidencyYearWindow(settings, currentYear);
-  return db.getAllAsync<DayRecordRow>(
-    "SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC",
-    window.startDate,
-    window.endDate
-  );
+  return db.getAllAsync<DayRecordRow>("SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC", window.startDate, window.endDate);
 }
 
 export async function readDayRecordsForDateRange(startDate: string, endDate: string) {
   const db = await getDb();
-  return db.getAllAsync<DayRecordRow>(
-    "SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC",
-    startDate,
-    endDate
-  );
+  return db.getAllAsync<DayRecordRow>("SELECT * FROM day_records WHERE date >= ? AND date <= ? ORDER BY date ASC", startDate, endDate);
 }
 
 export async function readTrips() {
@@ -352,12 +335,7 @@ export async function readTrips() {
   })) satisfies Trip[];
 }
 
-export async function insertManualTravelEntry(entry: {
-  startDate: string;
-  endDate: string;
-  countryCode: string;
-  countryName: string;
-}) {
+export async function insertManualTravelEntry(entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) {
   const now = new Date().toISOString();
   const tripId = uuid("trip");
   const dates = enumerateIsoDates(entry.startDate, entry.endDate);
@@ -420,12 +398,7 @@ export async function insertManualTravelEntry(entry: {
   return tripId;
 }
 
-export async function updateManualDayEntry(entry: {
-  originalDate: string;
-  date: string;
-  countryCode: string;
-  countryName: string;
-}) {
+export async function updateManualDayEntry(entry: { originalDate: string; date: string; countryCode: string; countryName: string }) {
   const now = new Date().toISOString();
   const affectedDates = entry.originalDate === entry.date ? [entry.date] : [entry.originalDate, entry.date];
 
@@ -525,11 +498,7 @@ export async function readDayRecordsForMonth(monthStartIso: string) {
   const start = monthStartIso.slice(0, 8) + "01";
   const end = new Date(`${start}T00:00:00.000Z`);
   end.setUTCMonth(end.getUTCMonth() + 1);
-  return db.getAllAsync<DayRecordRow>(
-    "SELECT * FROM day_records WHERE date >= ? AND date < ? ORDER BY date ASC",
-    start,
-    end.toISOString().slice(0, 10)
-  );
+  return db.getAllAsync<DayRecordRow>("SELECT * FROM day_records WHERE date >= ? AND date < ? ORDER BY date ASC", start, end.toISOString().slice(0, 10));
 }
 
 async function removeManualTripsForDate(db: SQLite.SQLiteDatabase, date: string, now: string) {

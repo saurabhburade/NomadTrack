@@ -1,23 +1,51 @@
 import { addDays, addMonths, endOfMonth, format, isAfter, isSameMonth, parseISO, startOfMonth, subMonths } from "date-fns";
+import { BlurView } from "expo-blur";
 import { CalendarDays, ChevronLeft, ChevronRight, Globe2, PencilLine, Plus, Trash2 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, useWindowDimensions, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Alert,
+  type GestureResponderEvent,
+  Keyboard,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  type StyleProp,
+  StyleSheet,
+  TextInput,
+  useColorScheme,
+  useWindowDimensions,
+  View,
+  type ViewStyle
+} from "react-native";
 import { CalendarList, type CalendarListProps, type DateData } from "react-native-calendars";
-import { BlurView } from "expo-blur";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  Easing as ReanimatedEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { NativeCalendarMonthGrid, isNativeCalendarMonthGridAvailable, isNativeCalendarMonthGridSummaryAvailable } from "../components/native/NativeCalendarMonthGrid";
-import { NativeCalendarToolbar, isNativeCalendarToolbarAvailable } from "../components/native/NativeCalendarToolbar";
-import { NativeEditDaySheet, isNativeEditDaySheetAvailable } from "../components/native/NativeEditDaySheet";
-import { NativeManualEntrySheet, isNativeManualEntrySheetAvailable } from "../components/native/NativeManualEntrySheet";
-import { NativeMonthYearSheet, isNativeMonthYearSheetAvailable } from "../components/native/NativeMonthYearSheet";
 import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
-import { DrawerActionButton } from "../components/ui/drawer-action-button";
+import {
+  isNativeCalendarMonthGridAvailable,
+  isNativeCalendarMonthGridSummaryAvailable,
+  NativeCalendarMonthGrid
+} from "../components/native/NativeCalendarMonthGrid";
+import { isNativeCalendarToolbarAvailable, NativeCalendarToolbar } from "../components/native/NativeCalendarToolbar";
+import { isNativeEditDaySheetAvailable, NativeEditDaySheet } from "../components/native/NativeEditDaySheet";
+import { isNativeManualEntrySheetAvailable, NativeManualEntrySheet } from "../components/native/NativeManualEntrySheet";
+import { isNativeMonthYearSheetAvailable, NativeMonthYearSheet } from "../components/native/NativeMonthYearSheet";
 import { BlurReplaceText } from "../components/ui/blur-replace-text";
+import { DrawerActionButton } from "../components/ui/drawer-action-button";
 import { Text } from "../components/ui/text";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
-import { useAppStore, type DayRecordPreview } from "../store/appStore";
+import { type DayRecordPreview, useAppStore } from "../store/appStore";
 
 const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -38,7 +66,256 @@ type CalendarDayTouchStart = {
 
 const priorityCountryCodes = ["IN", "US", "GB", "AE", "SG", "CA", "AU", "DE", "FR", "JP", "TH", "MY", "ID", "LK", "NP", "BD"] as const;
 const isoCountryCodes = [
-  "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "XK", "YE", "YT", "ZA", "ZM", "ZW"
+  "AD",
+  "AE",
+  "AF",
+  "AG",
+  "AI",
+  "AL",
+  "AM",
+  "AO",
+  "AQ",
+  "AR",
+  "AS",
+  "AT",
+  "AU",
+  "AW",
+  "AX",
+  "AZ",
+  "BA",
+  "BB",
+  "BD",
+  "BE",
+  "BF",
+  "BG",
+  "BH",
+  "BI",
+  "BJ",
+  "BL",
+  "BM",
+  "BN",
+  "BO",
+  "BQ",
+  "BR",
+  "BS",
+  "BT",
+  "BV",
+  "BW",
+  "BY",
+  "BZ",
+  "CA",
+  "CC",
+  "CD",
+  "CF",
+  "CG",
+  "CH",
+  "CI",
+  "CK",
+  "CL",
+  "CM",
+  "CN",
+  "CO",
+  "CR",
+  "CU",
+  "CV",
+  "CW",
+  "CX",
+  "CY",
+  "CZ",
+  "DE",
+  "DJ",
+  "DK",
+  "DM",
+  "DO",
+  "DZ",
+  "EC",
+  "EE",
+  "EG",
+  "EH",
+  "ER",
+  "ES",
+  "ET",
+  "FI",
+  "FJ",
+  "FK",
+  "FM",
+  "FO",
+  "FR",
+  "GA",
+  "GB",
+  "GD",
+  "GE",
+  "GF",
+  "GG",
+  "GH",
+  "GI",
+  "GL",
+  "GM",
+  "GN",
+  "GP",
+  "GQ",
+  "GR",
+  "GS",
+  "GT",
+  "GU",
+  "GW",
+  "GY",
+  "HK",
+  "HM",
+  "HN",
+  "HR",
+  "HT",
+  "HU",
+  "ID",
+  "IE",
+  "IL",
+  "IM",
+  "IN",
+  "IO",
+  "IQ",
+  "IR",
+  "IS",
+  "IT",
+  "JE",
+  "JM",
+  "JO",
+  "JP",
+  "KE",
+  "KG",
+  "KH",
+  "KI",
+  "KM",
+  "KN",
+  "KP",
+  "KR",
+  "KW",
+  "KY",
+  "KZ",
+  "LA",
+  "LB",
+  "LC",
+  "LI",
+  "LK",
+  "LR",
+  "LS",
+  "LT",
+  "LU",
+  "LV",
+  "LY",
+  "MA",
+  "MC",
+  "MD",
+  "ME",
+  "MF",
+  "MG",
+  "MH",
+  "MK",
+  "ML",
+  "MM",
+  "MN",
+  "MO",
+  "MP",
+  "MQ",
+  "MR",
+  "MS",
+  "MT",
+  "MU",
+  "MV",
+  "MW",
+  "MX",
+  "MY",
+  "MZ",
+  "NA",
+  "NC",
+  "NE",
+  "NF",
+  "NG",
+  "NI",
+  "NL",
+  "NO",
+  "NP",
+  "NR",
+  "NU",
+  "NZ",
+  "OM",
+  "PA",
+  "PE",
+  "PF",
+  "PG",
+  "PH",
+  "PK",
+  "PL",
+  "PM",
+  "PN",
+  "PR",
+  "PS",
+  "PT",
+  "PW",
+  "PY",
+  "QA",
+  "RE",
+  "RO",
+  "RS",
+  "RU",
+  "RW",
+  "SA",
+  "SB",
+  "SC",
+  "SD",
+  "SE",
+  "SG",
+  "SH",
+  "SI",
+  "SJ",
+  "SK",
+  "SL",
+  "SM",
+  "SN",
+  "SO",
+  "SR",
+  "SS",
+  "ST",
+  "SV",
+  "SX",
+  "SY",
+  "SZ",
+  "TC",
+  "TD",
+  "TF",
+  "TG",
+  "TH",
+  "TJ",
+  "TK",
+  "TL",
+  "TM",
+  "TN",
+  "TO",
+  "TR",
+  "TT",
+  "TV",
+  "TW",
+  "TZ",
+  "UA",
+  "UG",
+  "UM",
+  "US",
+  "UY",
+  "UZ",
+  "VA",
+  "VC",
+  "VE",
+  "VG",
+  "VI",
+  "VN",
+  "VU",
+  "WF",
+  "WS",
+  "XK",
+  "YE",
+  "YT",
+  "ZA",
+  "ZM",
+  "ZW"
 ] as const;
 const countryNameOverrides: Record<string, string> = {
   AD: "Andorra",
@@ -317,7 +594,19 @@ export function CalendarScreen() {
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const { monthRecords, monthRecordsMonth, yearRecords, selectedDate, setSelectedDate, settings, trips, addManualEntry, clearManualEntryRange, updateDayEntry, deleteDayEntry } = useAppStore();
+  const {
+    monthRecords,
+    monthRecordsMonth,
+    yearRecords,
+    selectedDate,
+    setSelectedDate,
+    settings,
+    trips,
+    addManualEntry,
+    clearManualEntryRange,
+    updateDayEntry,
+    deleteDayEntry
+  } = useAppStore();
   const isDark = settings.appearance === "dark" || (settings.appearance === "system" && scheme === "dark");
   const palette = getPalette(isDark);
   const calendarWidth = Math.max(280, windowWidth - 36);
@@ -377,7 +666,10 @@ export function CalendarScreen() {
   );
   const editingRecord = editingDate ? recordsByDate.get(editingDate) : undefined;
   const calendarScrollRange = useMemo(() => getCalendarScrollRange(month), [month]);
-  const calendarRenderKey = useMemo(() => `${calendarMonthKey}:${selectedDate}:${visibleMonthRecords.map((record) => `${record.date}:${record.primary_country_code ?? ""}`).join(",")}`, [calendarMonthKey, visibleMonthRecords, selectedDate]);
+  const calendarRenderKey = useMemo(
+    () => `${calendarMonthKey}:${selectedDate}:${visibleMonthRecords.map((record) => `${record.date}:${record.primary_country_code ?? ""}`).join(",")}`,
+    [calendarMonthKey, visibleMonthRecords, selectedDate]
+  );
   const programmaticMonthIsoRef = useRef<string | null>(null);
   const calendarDayTouchStartRef = useRef<CalendarDayTouchStart | null>(null);
   const lastDayOpenRef = useRef<{ iso: string; openedAt: number } | null>(null);
@@ -397,17 +689,20 @@ export function CalendarScreen() {
     programmaticMonthIsoRef.current = monthIso;
   }, []);
 
-  const selectDay = useCallback((iso: string) => {
-    const now = Date.now();
-    const lastOpen = lastDayOpenRef.current;
-    if (lastOpen?.iso === iso && now - lastOpen.openedAt < 250) return;
+  const selectDay = useCallback(
+    (iso: string) => {
+      const now = Date.now();
+      const lastOpen = lastDayOpenRef.current;
+      if (lastOpen?.iso === iso && now - lastOpen.openedAt < 250) return;
 
-    lastDayOpenRef.current = { iso, openedAt: now };
-    setEditingDate(iso);
-    void setSelectedDate(iso).catch((error) => {
-      console.warn("[calendar] Failed to select day", error);
-    });
-  }, [setSelectedDate]);
+      lastDayOpenRef.current = { iso, openedAt: now };
+      setEditingDate(iso);
+      void setSelectedDate(iso).catch((error) => {
+        console.warn("[calendar] Failed to select day", error);
+      });
+    },
+    [setSelectedDate]
+  );
 
   const handleDayTouchStart = useCallback((iso: string, event: GestureResponderEvent) => {
     calendarDayTouchStartRef.current = {
@@ -434,12 +729,15 @@ export function CalendarScreen() {
     [selectDay]
   );
 
-  const shiftMonth = useCallback(async (direction: -1 | 1) => {
-    const nextMonth = direction === 1 ? addMonths(month, 1) : subMonths(month, 1);
-    const nextIso = setVisibleMonth(nextMonth);
-    markProgrammaticMonth(nextIso);
-    await setSelectedDate(nextIso);
-  }, [markProgrammaticMonth, month, setSelectedDate, setVisibleMonth]);
+  const shiftMonth = useCallback(
+    async (direction: -1 | 1) => {
+      const nextMonth = direction === 1 ? addMonths(month, 1) : subMonths(month, 1);
+      const nextIso = setVisibleMonth(nextMonth);
+      markProgrammaticMonth(nextIso);
+      await setSelectedDate(nextIso);
+    },
+    [markProgrammaticMonth, month, setSelectedDate, setVisibleMonth]
+  );
 
   async function changeMonth(nextMonth: Date) {
     const nextIso = setVisibleMonth(nextMonth);
@@ -477,7 +775,7 @@ export function CalendarScreen() {
       const record = recordsByDate.get(iso);
       const isSelected = iso === selectedDateInMonth;
       const isFuture = isAfter(dayDate, parseISO(todayIso));
-      const countryCode = isVisibleMonthDay ? record?.primary_country_code ?? null : null;
+      const countryCode = isVisibleMonthDay ? (record?.primary_country_code ?? null) : null;
       const dayOpacity = state === "disabled" || (isFuture && !countryCode) ? 0.56 : 1;
 
       return (
@@ -495,7 +793,14 @@ export function CalendarScreen() {
           onTouchStart={(event) => handleDayTouchStart(iso, event)}
         >
           <View style={[styles.dayNumberCircle, { opacity: dayOpacity }]}>
-            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={42} tint={palette.blurTint} tintColor={isSelected ? palette.selectedFill : palette.inputFill} style={StyleSheet.absoluteFill} />
+            <LiquidGlassLayer
+              colorScheme="auto"
+              glassStyle="regular"
+              intensity={42}
+              tint={palette.blurTint}
+              tintColor={isSelected ? palette.selectedFill : palette.inputFill}
+              style={StyleSheet.absoluteFill}
+            />
             <Text
               numberOfLines={1}
               style={[
@@ -600,108 +905,151 @@ export function CalendarScreen() {
                 <Text className="flex-1 text-3xl font-extrabold" numberOfLines={1} adjustsFontSizeToFit style={[styles.title, { color: palette.foreground }]}>
                   History
                 </Text>
-                <Pressable accessibilityRole="button" accessibilityLabel="Add travel entry" style={({ pressed }) => [styles.addButton, { shadowColor: palette.addShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={openManualEntry}>
-                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add travel entry"
+                  style={({ pressed }) => [styles.addButton, { shadowColor: palette.addShadow }, pressed ? styles.roundIconButtonPressed : null]}
+                  onPress={openManualEntry}
+                >
+                  <LiquidGlassLayer
+                    colorScheme="auto"
+                    glassStyle="regular"
+                    intensity={54}
+                    tint={palette.blurTint}
+                    tintColor={palette.addButton}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <Plus size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
               </View>
 
               <View style={styles.monthRow}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Previous month" style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => void shiftMonth(-1)}>
-                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous month"
+                  style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]}
+                  onPress={() => void shiftMonth(-1)}
+                >
+                  <LiquidGlassLayer
+                    colorScheme="auto"
+                    glassStyle="regular"
+                    intensity={54}
+                    tint={palette.blurTint}
+                    tintColor={palette.addButton}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <ChevronLeft size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
-                <MonthHeaderButton label={format(month, "MMMM yyyy")} palette={palette} style={styles.monthCenterLabel} onPress={() => setIsMonthPickerOpen(true)} />
-                <Pressable accessibilityRole="button" accessibilityLabel="Next month" style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]} onPress={() => void shiftMonth(1)}>
-                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={54} tint={palette.blurTint} tintColor={palette.addButton} style={StyleSheet.absoluteFill} />
+                <MonthHeaderButton
+                  label={format(month, "MMMM yyyy")}
+                  palette={palette}
+                  style={styles.monthCenterLabel}
+                  onPress={() => setIsMonthPickerOpen(true)}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Next month"
+                  style={({ pressed }) => [styles.monthButton, { shadowColor: palette.glassShadow }, pressed ? styles.roundIconButtonPressed : null]}
+                  onPress={() => void shiftMonth(1)}
+                >
+                  <LiquidGlassLayer
+                    colorScheme="auto"
+                    glassStyle="regular"
+                    intensity={54}
+                    tint={palette.blurTint}
+                    tintColor={palette.addButton}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <ChevronRight size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
               </View>
             </>
           )}
 
-        {isNativeCalendarMonthGridSummaryAvailable ? null : <MonthSummaryPanel palette={palette} summary={monthSummary} />}
+          {isNativeCalendarMonthGridSummaryAvailable ? null : <MonthSummaryPanel palette={palette} summary={monthSummary} />}
 
-        {isNativeCalendarMonthGridAvailable ? (
-          <NativeCalendarMonthGrid
-            dayRecords={nativeCalendarDayRecords}
-            monthDate={format(month, "yyyy-MM-dd")}
-            palette={{
-              accent: palette.accent,
-              card: palette.card,
-              foreground: palette.foreground,
-              inputBorder: palette.inputBorder,
-              inputFill: palette.inputFill,
-              muted: palette.muted,
-              weekday: palette.weekdayHeader
-            }}
-            selectedDate={selectedDateInMonth}
-            summary={nativeMonthSummary}
-            style={[styles.nativeCalendarMonthGrid, { width: calendarWidth }]}
-            onDayPress={selectDay}
-            onNextMonth={() => void shiftMonth(1)}
-            onPreviousMonth={() => void shiftMonth(-1)}
-          />
-        ) : (
-          <>
-            <View style={[styles.weekdayRow, { width: calendarWidth }]}>
-              {weekdays.map((weekday) => (
-                <Text key={weekday} numberOfLines={1} style={[styles.weekdayLabel, { color: palette.weekdayHeader }]}>
-                  {weekday.slice(0, 3)}
-                </Text>
-              ))}
-            </View>
-
-            <CalendarList
-              animateScroll
-              calendarHeight={390}
-              calendarStyle={styles.calendarPage}
-              calendarWidth={calendarWidth}
-              current={format(month, "yyyy-MM-dd")}
-              dayComponent={renderCalendarDay}
-              extraData={calendarRenderKey}
-              firstDay={0}
-              futureScrollRange={calendarScrollRange.futureScrollRange}
-              hideArrows
-              hideDayNames
-              hideExtraDays
-              horizontal
-              initialDate={format(month, "yyyy-MM-dd")}
-              key={calendarMonthKey}
-              keyboardShouldPersistTaps="handled"
-              pagingEnabled
-              pastScrollRange={calendarScrollRange.pastScrollRange}
-              removeClippedSubviews={false}
-              renderHeader={() => null}
-              showScrollIndicator={false}
-              showSixWeeks
-              style={styles.calendarGrid}
-              theme={{
-                calendarBackground: "transparent",
-                textSectionTitleColor: palette.weekdayHeader,
-                textDayHeaderFontFamily: "Inter_700Bold",
-                textDayHeaderFontSize: 12,
-                weekVerticalMargin: 0,
-                "stylesheet.calendar.header": {
-                  header: styles.calendarLibraryHiddenHeader,
-                  dayHeader: styles.calendarLibraryDayHeader,
-                  week: styles.calendarLibraryWeekHeader
-                },
-                "stylesheet.calendar.main": {
-                  container: styles.calendarLibraryContainer,
-                  dayContainer: styles.calendarLibraryDayContainer,
-                  emptyDayContainer: styles.calendarLibraryEmptyDayContainer,
-                  monthView: styles.calendarLibraryMonthView,
-                  week: styles.calendarLibraryWeek
-                }
-              } as CalendarListProps["theme"]}
-              onDayPress={(date) => selectDay(date.dateString)}
-              onVisibleMonthsChange={handleVisibleMonthsChange}
+          {isNativeCalendarMonthGridAvailable ? (
+            <NativeCalendarMonthGrid
+              dayRecords={nativeCalendarDayRecords}
+              monthDate={format(month, "yyyy-MM-dd")}
+              palette={{
+                accent: palette.accent,
+                card: palette.card,
+                foreground: palette.foreground,
+                inputBorder: palette.inputBorder,
+                inputFill: palette.inputFill,
+                muted: palette.muted,
+                weekday: palette.weekdayHeader
+              }}
+              selectedDate={selectedDateInMonth}
+              summary={nativeMonthSummary}
+              style={[styles.nativeCalendarMonthGrid, { width: calendarWidth }]}
+              onDayPress={selectDay}
+              onNextMonth={() => void shiftMonth(1)}
+              onPreviousMonth={() => void shiftMonth(-1)}
             />
-          </>
-        )}
+          ) : (
+            <>
+              <View style={[styles.weekdayRow, { width: calendarWidth }]}>
+                {weekdays.map((weekday) => (
+                  <Text key={weekday} numberOfLines={1} style={[styles.weekdayLabel, { color: palette.weekdayHeader }]}>
+                    {weekday.slice(0, 3)}
+                  </Text>
+                ))}
+              </View>
 
-        <View style={styles.spacer} />
+              <CalendarList
+                animateScroll
+                calendarHeight={390}
+                calendarStyle={styles.calendarPage}
+                calendarWidth={calendarWidth}
+                current={format(month, "yyyy-MM-dd")}
+                dayComponent={renderCalendarDay}
+                extraData={calendarRenderKey}
+                firstDay={0}
+                futureScrollRange={calendarScrollRange.futureScrollRange}
+                hideArrows
+                hideDayNames
+                hideExtraDays
+                horizontal
+                initialDate={format(month, "yyyy-MM-dd")}
+                key={calendarMonthKey}
+                keyboardShouldPersistTaps="handled"
+                pagingEnabled
+                pastScrollRange={calendarScrollRange.pastScrollRange}
+                removeClippedSubviews={false}
+                renderHeader={() => null}
+                showScrollIndicator={false}
+                showSixWeeks
+                style={styles.calendarGrid}
+                theme={
+                  {
+                    calendarBackground: "transparent",
+                    textSectionTitleColor: palette.weekdayHeader,
+                    textDayHeaderFontFamily: "Inter_700Bold",
+                    textDayHeaderFontSize: 12,
+                    weekVerticalMargin: 0,
+                    "stylesheet.calendar.header": {
+                      header: styles.calendarLibraryHiddenHeader,
+                      dayHeader: styles.calendarLibraryDayHeader,
+                      week: styles.calendarLibraryWeekHeader
+                    },
+                    "stylesheet.calendar.main": {
+                      container: styles.calendarLibraryContainer,
+                      dayContainer: styles.calendarLibraryDayContainer,
+                      emptyDayContainer: styles.calendarLibraryEmptyDayContainer,
+                      monthView: styles.calendarLibraryMonthView,
+                      week: styles.calendarLibraryWeek
+                    }
+                  } as CalendarListProps["theme"]
+                }
+                onDayPress={(date) => selectDay(date.dateString)}
+                onVisibleMonthsChange={handleVisibleMonthsChange}
+              />
+            </>
+          )}
+
+          <View style={styles.spacer} />
         </View>
       </ScrollView>
 
@@ -867,7 +1215,17 @@ type MonthSummary = {
   topCountries: Array<{ code: string; name: string; days: number }>;
 };
 
-function MonthHeaderButton({ label, palette, style, onPress }: { label: string; palette: ReturnType<typeof getPalette>; style?: StyleProp<ViewStyle>; onPress: () => void }) {
+function MonthHeaderButton({
+  label,
+  palette,
+  style,
+  onPress
+}: {
+  label: string;
+  palette: ReturnType<typeof getPalette>;
+  style?: StyleProp<ViewStyle>;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -884,7 +1242,10 @@ function MonthHeaderButton({ label, palette, style, onPress }: { label: string; 
       onPress={onPress}
     >
       <BlurView intensity={84} pointerEvents="none" tint={palette.basicBlurTint} style={[StyleSheet.absoluteFill, styles.monthLabelGlass]} />
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.monthLabelOverlay, { backgroundColor: palette.actionPrimaryFill, borderColor: palette.actionPrimaryFill }]} />
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.monthLabelOverlay, { backgroundColor: palette.actionPrimaryFill, borderColor: palette.actionPrimaryFill }]}
+      />
       <View pointerEvents="none" style={[styles.monthLabelSheen, { backgroundColor: palette.monthLabelSheen }]} />
       <View pointerEvents="none" style={[styles.monthLabelBottomGlow, { backgroundColor: palette.monthLabelBottomGlow }]} />
       <View style={styles.monthLabelContent}>
@@ -936,9 +1297,7 @@ function MonthSummaryPanel({ palette, summary }: { palette: ReturnType<typeof ge
           containerStyle={styles.monthSummaryCountryStage}
           style={[styles.monthSummaryCountryText, { color: palette.muted }]}
         />
-        {statusSummary ? (
-          <BlurReplaceText value={statusSummary} style={[styles.monthSummaryStatusText, { color: palette.weekday }]} />
-        ) : null}
+        {statusSummary ? <BlurReplaceText value={statusSummary} style={[styles.monthSummaryStatusText, { color: palette.weekday }]} /> : null}
       </View>
     </View>
   );
@@ -967,7 +1326,9 @@ function buildMonthSummaryCountryText(summary: MonthSummary) {
 }
 
 function buildMonthSummaryStatusText(summary: MonthSummary) {
-  return [summary.manualDays > 0 ? `${summary.manualDays} manual` : null, summary.untrackedDays > 0 ? `${summary.untrackedDays} untracked` : null].filter(Boolean).join(" / ");
+  return [summary.manualDays > 0 ? `${summary.manualDays} manual` : null, summary.untrackedDays > 0 ? `${summary.untrackedDays} untracked` : null]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 function buildMonthSummary(records: MonthSummaryRecord[], month: Date): MonthSummary {
@@ -1181,7 +1542,12 @@ function MonthYearPicker({
             </View>
 
             <View style={[styles.yearPicker, { backgroundColor: palette.inputFill, borderColor: palette.inputBorder }]}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Previous year" style={styles.pickerIconButton} onPress={() => updateYear(draftYear - 1)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Previous year"
+                style={styles.pickerIconButton}
+                onPress={() => updateYear(draftYear - 1)}
+              >
                 <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
               </Pressable>
               <BlurReplaceText value={String(draftYear)} style={[styles.monthPickerYearText, { color: palette.foreground }]} />
@@ -1207,7 +1573,14 @@ function MonthYearPicker({
                     ]}
                     onPress={() => setDraftMonth(index)}
                   >
-                    <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
+                    <LiquidGlassLayer
+                      colorScheme="auto"
+                      glassStyle="regular"
+                      intensity={48}
+                      tint={palette.blurTint}
+                      tintColor={selected ? palette.selectedFill : palette.chipFill}
+                      style={StyleSheet.absoluteFill}
+                    />
                     <Text className="text-sm font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }}>
                       {name}
                     </Text>
@@ -1217,8 +1590,23 @@ function MonthYearPicker({
             </View>
 
             <View style={styles.drawerActions}>
-              <DrawerActionButton backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-              <DrawerActionButton backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={confirmSelection} />
+              <DrawerActionButton
+                backgroundColor={palette.actionSecondaryFill}
+                borderColor={palette.actionSecondaryBorder}
+                foregroundColor={palette.foreground}
+                title="Cancel"
+                style={styles.nativeActionButton}
+                onPress={onClose}
+              />
+              <DrawerActionButton
+                backgroundColor={palette.actionPrimaryFill}
+                borderColor={palette.actionPrimaryFill}
+                foregroundColor={palette.actionPrimaryForeground}
+                systemImage="checkmark"
+                title="Confirm"
+                style={styles.nativeActionButton}
+                onPress={confirmSelection}
+              />
             </View>
           </View>
         </Animated.View>
@@ -1419,7 +1807,12 @@ function ManualEntryDrawer({
   }
 
   const manualContent = (
-    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.manualDrawerContent}
+    >
       <View style={styles.drawerHeaderRow}>
         <View style={[styles.drawerIcon, { backgroundColor: palette.card }]}>
           <PencilLine size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
@@ -1486,7 +1879,14 @@ function ManualEntryDrawer({
                   setErrorMessage(null);
                 }}
               >
-                <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
+                <LiquidGlassLayer
+                  colorScheme="auto"
+                  glassStyle="regular"
+                  intensity={48}
+                  tint={palette.blurTint}
+                  tintColor={selected ? palette.selectedFill : palette.chipFill}
+                  style={StyleSheet.absoluteFill}
+                />
                 <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
                   {country.name} ({country.code})
                 </Text>
@@ -1505,9 +1905,37 @@ function ManualEntryDrawer({
       </View>
 
       <View style={styles.drawerActions}>
-        <DrawerActionButton disabled={isSaving || isClearing} loading={isClearing} backgroundColor={palette.errorFill} borderColor={palette.errorBorder} foregroundColor={palette.errorText} systemImage="trash" title={isClearing ? "Clearing" : "Clear"} style={styles.nativeActionButton} onPress={requestClearRange} />
-        <DrawerActionButton disabled={isSaving || isClearing} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-        <DrawerActionButton disabled={isSaving || isClearing} loading={isSaving} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Saving" : "Confirm"} style={styles.nativeActionButton} onPress={() => void submit()} />
+        <DrawerActionButton
+          disabled={isSaving || isClearing}
+          loading={isClearing}
+          backgroundColor={palette.errorFill}
+          borderColor={palette.errorBorder}
+          foregroundColor={palette.errorText}
+          systemImage="trash"
+          title={isClearing ? "Clearing" : "Clear"}
+          style={styles.nativeActionButton}
+          onPress={requestClearRange}
+        />
+        <DrawerActionButton
+          disabled={isSaving || isClearing}
+          backgroundColor={palette.actionSecondaryFill}
+          borderColor={palette.actionSecondaryBorder}
+          foregroundColor={palette.foreground}
+          title="Cancel"
+          style={styles.nativeActionButton}
+          onPress={onClose}
+        />
+        <DrawerActionButton
+          disabled={isSaving || isClearing}
+          loading={isSaving}
+          backgroundColor={palette.actionPrimaryFill}
+          borderColor={palette.actionPrimaryFill}
+          foregroundColor={palette.actionPrimaryForeground}
+          systemImage="checkmark"
+          title={isSaving ? "Saving" : "Confirm"}
+          style={styles.nativeActionButton}
+          onPress={() => void submit()}
+        />
       </View>
     </ScrollView>
   );
@@ -1748,7 +2176,12 @@ function DayEditDrawer({
             </Animated.View>
           </GestureDetector>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.manualDrawerContent}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.manualDrawerContent}
+          >
             <View style={styles.drawerHeaderRow}>
               <View style={[styles.drawerIcon, { backgroundColor: palette.card }]}>
                 <PencilLine size={20} color={palette.foreground} strokeWidth={iconStrokeWidth} />
@@ -1767,10 +2200,21 @@ function DayEditDrawer({
                   accessibilityRole="button"
                   disabled={isSaving || isDeleting}
                   hitSlop={8}
-                  style={[styles.drawerHeaderDeleteButton, { backgroundColor: palette.destructiveFill, borderColor: palette.destructiveBorder }, isSaving || isDeleting ? styles.disabledHeaderButton : null]}
+                  style={[
+                    styles.drawerHeaderDeleteButton,
+                    { backgroundColor: palette.destructiveFill, borderColor: palette.destructiveBorder },
+                    isSaving || isDeleting ? styles.disabledHeaderButton : null
+                  ]}
                   onPress={confirmDelete}
                 >
-                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={palette.destructiveFill} style={StyleSheet.absoluteFill} />
+                  <LiquidGlassLayer
+                    colorScheme="auto"
+                    glassStyle="regular"
+                    intensity={48}
+                    tint={palette.blurTint}
+                    tintColor={palette.destructiveFill}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <Trash2 size={19} color={palette.destructiveForeground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
               ) : null}
@@ -1837,7 +2281,14 @@ function DayEditDrawer({
                         setErrorMessage(null);
                       }}
                     >
-                      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={48} tint={palette.blurTint} tintColor={selected ? palette.selectedFill : palette.chipFill} style={StyleSheet.absoluteFill} />
+                      <LiquidGlassLayer
+                        colorScheme="auto"
+                        glassStyle="regular"
+                        intensity={48}
+                        tint={palette.blurTint}
+                        tintColor={selected ? palette.selectedFill : palette.chipFill}
+                        style={StyleSheet.absoluteFill}
+                      />
                       <Text className="text-xs font-bold" style={{ color: selected ? palette.selectedForeground : palette.foreground }} numberOfLines={1}>
                         {country.name} ({country.code})
                       </Text>
@@ -1856,8 +2307,25 @@ function DayEditDrawer({
             </View>
 
             <View style={styles.drawerActions}>
-              <DrawerActionButton disabled={isSaving || isDeleting} backgroundColor={palette.actionSecondaryFill} borderColor={palette.actionSecondaryBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-              <DrawerActionButton disabled={isSaving || isDeleting} backgroundColor={palette.actionPrimaryFill} borderColor={palette.actionPrimaryFill} foregroundColor={palette.actionPrimaryForeground} systemImage="checkmark" title={isSaving ? "Updating" : "Update"} style={styles.nativeActionButton} onPress={() => void submit()} />
+              <DrawerActionButton
+                disabled={isSaving || isDeleting}
+                backgroundColor={palette.actionSecondaryFill}
+                borderColor={palette.actionSecondaryBorder}
+                foregroundColor={palette.foreground}
+                title="Cancel"
+                style={styles.nativeActionButton}
+                onPress={onClose}
+              />
+              <DrawerActionButton
+                disabled={isSaving || isDeleting}
+                backgroundColor={palette.actionPrimaryFill}
+                borderColor={palette.actionPrimaryFill}
+                foregroundColor={palette.actionPrimaryForeground}
+                systemImage="checkmark"
+                title={isSaving ? "Updating" : "Update"}
+                style={styles.nativeActionButton}
+                onPress={() => void submit()}
+              />
             </View>
           </ScrollView>
         </Animated.View>
@@ -2000,8 +2468,23 @@ function CalendarDateRangeFields({
                     ]}
                   />
                 ) : null}
-                <View style={[styles.rangeDayCircle, { backgroundColor: isSelected ? palette.selectedFill : "transparent", borderColor: isSelected ? palette.selectedBorder : "transparent", opacity: dayOpacity }]}>
-                  <Text style={[styles.rangeDayNumber, existingCountryCode ? styles.rangeDayNumberWithFlag : null, { color: isSelected ? palette.selectedForeground : palette.foreground }]}>
+                <View
+                  style={[
+                    styles.rangeDayCircle,
+                    {
+                      backgroundColor: isSelected ? palette.selectedFill : "transparent",
+                      borderColor: isSelected ? palette.selectedBorder : "transparent",
+                      opacity: dayOpacity
+                    }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.rangeDayNumber,
+                      existingCountryCode ? styles.rangeDayNumberWithFlag : null,
+                      { color: isSelected ? palette.selectedForeground : palette.foreground }
+                    ]}
+                  >
                     {cell.day}
                   </Text>
                   {existingCountryCode ? <Text style={styles.rangeDayCircleFlag}>{flagForCountry(existingCountryCode)}</Text> : null}
@@ -2091,7 +2574,14 @@ function RangeBoundaryButton({
       ]}
       onPress={onPress}
     >
-      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={46} tint={palette.blurTint} tintColor={active ? palette.selectedFill : palette.inputFill} style={StyleSheet.absoluteFill} />
+      <LiquidGlassLayer
+        colorScheme="auto"
+        glassStyle="regular"
+        intensity={46}
+        tint={palette.blurTint}
+        tintColor={active ? palette.selectedFill : palette.inputFill}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.dateBoundaryContent}>
         <Text className="text-xs font-bold" style={{ color: active ? palette.selectedMutedForeground : palette.muted }}>
           {label}
@@ -2240,9 +2730,11 @@ function displayCountryName(code: string) {
 
 function displayRegionName(code: string) {
   try {
-    const DisplayNames = (Intl as unknown as {
-      DisplayNames?: new (locales: string[], options: { type: "region" }) => { of: (regionCode: string) => string | undefined };
-    }).DisplayNames;
+    const DisplayNames = (
+      Intl as unknown as {
+        DisplayNames?: new (locales: string[], options: { type: "region" }) => { of: (regionCode: string) => string | undefined };
+      }
+    ).DisplayNames;
     return DisplayNames ? new DisplayNames(["en"], { type: "region" }).of(code) : undefined;
   } catch {
     return undefined;
@@ -2250,7 +2742,12 @@ function displayRegionName(code: string) {
 }
 
 function normalizeSearchText(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function flagForCountry(countryCode: string) {

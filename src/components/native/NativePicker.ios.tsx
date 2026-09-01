@@ -1,5 +1,5 @@
 import { Host, Picker as SwiftPicker } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativePickerVariant = "segmented" | "menu" | "inline" | "wheel" | "palette" | "radio";
 

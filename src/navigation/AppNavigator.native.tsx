@@ -1,16 +1,16 @@
-import { useMemo } from "react";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { CalendarDays, ChartPie, Map as MapIcon, Settings as SettingsIcon, type LucideIcon } from "lucide-react-native";
+import { CalendarDays, ChartPie, type LucideIcon, Map as MapIcon, Settings as SettingsIcon } from "lucide-react-native";
+import { useMemo } from "react";
 import { useColorScheme, View } from "react-native";
-import { DashboardScreen } from "../screens/DashboardScreen";
-import { CalendarScreen } from "../screens/CalendarScreen";
-import { MapScreen } from "../screens/MapScreen";
-import { TripsScreen } from "../screens/TripsScreen";
-import { SettingsScreen } from "../screens/SettingsScreen";
-import { YearOverviewScreen } from "../screens/YearOverviewScreen";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
+import { CalendarScreen } from "../screens/CalendarScreen";
+import { DashboardScreen } from "../screens/DashboardScreen";
+import { MapScreen } from "../screens/MapScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
+import { TripsScreen } from "../screens/TripsScreen";
+import { YearOverviewScreen } from "../screens/YearOverviewScreen";
 import { useAppStore } from "../store/appStore";
 
 export type RootTabParamList = {
@@ -66,9 +66,7 @@ export function AppNavigator() {
     <View style={{ flex: 1 }}>
       <NavigationContainer theme={navigationTheme}>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          <RootStack.Screen name="MainTabs">
-            {() => <MainTabs palette={palette} />}
-          </RootStack.Screen>
+          <RootStack.Screen name="MainTabs">{() => <MainTabs palette={palette} />}</RootStack.Screen>
           <RootStack.Screen name="Trips" component={TripsScreen} />
           <RootStack.Screen name="YearOverview" component={YearOverviewScreen} />
         </RootStack.Navigator>

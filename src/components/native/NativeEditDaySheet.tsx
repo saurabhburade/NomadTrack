@@ -37,12 +37,7 @@ export function NativeEditDaySheet(_props: {
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
-  onConfirm: (entry: {
-    originalDate: string;
-    date: string;
-    countryCode: string;
-    countryName: string;
-  }) => void;
+  onConfirm: (entry: { originalDate: string; date: string; countryCode: string; countryName: string }) => void;
   onDelete: (date: string) => void;
 }) {
   return null;

@@ -1,0 +1,16 @@
+overrides:
+  postcss: 8.5.26
+  "query-string>decode-uri-component": 0.5.0
+  "xcode>uuid": 11.1.1
+
+patchedDependencies:
+  "@expo/ui@0.2.0-beta.9": patches/@expo__ui@0.2.0-beta.9.patch
+  "expo-constants@18.0.14": patches/expo-constants@18.0.14.patch
+
+auditConfig:
+  ignoreGhsas:
+    # No patched image-size release exists. Expo/Metro only processes trusted,
+    # repository-owned image assets in this project. Remove these exceptions as
+    # soon as upstream publishes a fixed release.
+    - GHSA-5p2g-fcmc-qvqq
+    - GHSA-w3rx-r6r6-pgpr

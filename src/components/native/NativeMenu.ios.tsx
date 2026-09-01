@@ -1,6 +1,6 @@
-import { Button as SwiftButton, ContextMenu, Host } from "@expo/ui/swift-ui";
 import type { ButtonProps as SwiftButtonProps } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { ContextMenu, Host, Button as SwiftButton } from "@expo/ui/swift-ui";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 export type NativeMenuAction = {
   role?: "default" | "cancel" | "destructive";
@@ -21,7 +21,17 @@ type NativeMenuProps = {
   variant?: SwiftButtonProps["variant"];
 };
 
-export function NativeMenu({ accessibilityLabel, actions, color, controlSize = "large", frame, style, systemImage, title, variant = "glass" }: NativeMenuProps) {
+export function NativeMenu({
+  accessibilityLabel,
+  actions,
+  color,
+  controlSize = "large",
+  frame,
+  style,
+  systemImage,
+  title,
+  variant = "glass"
+}: NativeMenuProps) {
   const bleed = variant === "glass" || variant === "glassProminent" ? 8 : 0;
   const fixedFrame = frame
     ? {

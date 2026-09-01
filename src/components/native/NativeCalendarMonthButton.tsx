@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react-native";
-import { Pressable, StyleSheet, Text, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, type ViewStyle } from "react-native";
 import { iconStrokeWidth } from "../../lib/colors";
 
 type NativeCalendarMonthButtonProps = {

@@ -1,4 +1,4 @@
-import { TextInput, type KeyboardTypeOptions, type StyleProp, type TextStyle } from "react-native";
+import { type KeyboardTypeOptions, type StyleProp, TextInput, type TextStyle } from "react-native";
 
 type NativeTextInputProps = {
   defaultValue?: string;

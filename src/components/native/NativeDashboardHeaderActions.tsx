@@ -1,5 +1,5 @@
 import { ChevronLeft, MoreHorizontal } from "lucide-react-native";
-import { Pressable, StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { iconStrokeWidth } from "../../lib/colors";
 import { BlurReplaceText } from "../ui/blur-replace-text";
 
@@ -25,7 +25,15 @@ type NativeDashboardHeaderActionsProps = {
   onYearPress: () => void;
 };
 
-export function NativeDashboardHeaderActions({ accessibilityLabel, color, fiscalYearLabel, menuActions, style, trailingAction, onYearPress }: NativeDashboardHeaderActionsProps) {
+export function NativeDashboardHeaderActions({
+  accessibilityLabel,
+  color,
+  fiscalYearLabel,
+  menuActions,
+  style,
+  trailingAction,
+  onYearPress
+}: NativeDashboardHeaderActionsProps) {
   const tint = String(color ?? "#111111");
 
   return (

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 type NativePickerVariant = "segmented" | "menu" | "inline" | "wheel" | "palette" | "radio";
 

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
 import MapView, { Circle, Polygon } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderGlassButton, YearSelectorDrawer, getFiscalYearLabel } from "../components/year-selector-drawer";
 import { Card } from "../components/ui/card";
 import { Text } from "../components/ui/text";
+import { getFiscalYearLabel, HeaderGlassButton, YearSelectorDrawer } from "../components/year-selector-drawer";
 import { countryBoundaries } from "../data/countryBoundaries";
 import { getNeutralPalette } from "../lib/colors";
 import { formatRelativeTime } from "../lib/utils";
@@ -102,7 +102,9 @@ export function MapScreen() {
       </View>
       <View pointerEvents="box-none" style={[styles.summaryWrap, { top: insets.top + dashboardHeaderTopSpacing + 60 }]}>
         <Card className="gap-1" style={[styles.summaryCard, { backgroundColor: palette.card, borderColor: palette.border, shadowColor: palette.shadow }]}>
-          <Text variant="subtitle" style={{ color: palette.foreground }}>Country Footprint</Text>
+          <Text variant="subtitle" style={{ color: palette.foreground }}>
+            Country Footprint
+          </Text>
           <Text variant="muted">
             {yearLabel} - {dayEntries.length} {dayEntries.length === 1 ? "day" : "days"}
           </Text>
@@ -222,7 +224,10 @@ function getCombinedDayEntries(gpsDayEntries: MapDayEntry[], manualDayEntries: M
 }
 
 function getCityPoints(gpsDayEntries: MapDayEntry[]) {
-  const clusters = new Map<string, { latitudeSum: number; longitudeSum: number; weight: number; countryCode?: string; countryName?: string; source: "gps" | "manual" }>();
+  const clusters = new Map<
+    string,
+    { latitudeSum: number; longitudeSum: number; weight: number; countryCode?: string; countryName?: string; source: "gps" | "manual" }
+  >();
 
   function addCluster(key: string, latitude: number, longitude: number, entry: MapDayEntry) {
     const cluster = clusters.get(key) ?? { latitudeSum: 0, longitudeSum: 0, weight: 0, source: entry.source };

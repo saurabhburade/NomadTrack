@@ -1,6 +1,6 @@
-import { BlurView, type BlurTint } from "expo-blur";
-import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable, type GlassColorScheme, type GlassStyle } from "expo-glass-effect";
-import { StyleSheet, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type BlurTint, BlurView } from "expo-blur";
+import { type GlassColorScheme, type GlassStyle, GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
+import { type ColorValue, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
 
 type LiquidGlassLayerProps = {
   colorScheme?: GlassColorScheme;

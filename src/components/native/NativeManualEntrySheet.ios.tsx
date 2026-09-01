@@ -1,12 +1,4 @@
-import {
-  requireNativeComponent,
-  StyleSheet,
-  UIManager,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
+import { type NativeSyntheticEvent, requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 import type { NativeEditDaySheetCountry } from "./NativeEditDaySheet";
 import type { NativeManualEntryExistingRecord, NativeManualEntrySheetPalette } from "./NativeManualEntrySheet";
 
@@ -59,23 +51,13 @@ type NativeManualEntrySheetProps = {
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
-  onClear: (entry: {
-    startDate: string;
-    endDate: string;
-  }) => void;
-  onConfirm: (entry: {
-    startDate: string;
-    endDate: string;
-    countryCode: string;
-    countryName: string;
-  }) => void;
+  onClear: (entry: { startDate: string; endDate: string }) => void;
+  onConfirm: (entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) => void;
 };
 
 export const isNativeManualEntrySheetAvailable = UIManager.getViewManagerConfig?.("ManualEntrySheetView") != null;
 
-const ManualEntrySheetView = isNativeManualEntrySheetAvailable
-  ? requireNativeComponent<NativeManualEntrySheetViewProps>("ManualEntrySheetView")
-  : null;
+const ManualEntrySheetView = isNativeManualEntrySheetAvailable ? requireNativeComponent<NativeManualEntrySheetViewProps>("ManualEntrySheetView") : null;
 
 export function NativeManualEntrySheet({
   countries,

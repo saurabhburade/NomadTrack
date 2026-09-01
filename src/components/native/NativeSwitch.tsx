@@ -1,4 +1,4 @@
-import { Switch, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, Switch, type ViewStyle } from "react-native";
 
 type NativeSwitchProps = {
   disabled?: boolean;

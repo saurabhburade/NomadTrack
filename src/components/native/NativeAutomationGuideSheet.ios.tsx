@@ -1,4 +1,4 @@
-import { requireNativeComponent, StyleSheet, UIManager, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
+import { requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 
 export type NativeAutomationGuideSheetPalette = {
   foreground: string;

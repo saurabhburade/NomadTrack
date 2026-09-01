@@ -10,10 +10,7 @@ function withBoundReactNativeFactory(config) {
     }
 
     if (!mod.modResults.contents.includes(factoryBinding)) {
-      mod.modResults.contents = mod.modResults.contents.replace(
-        factoryAssignment,
-        `${factoryAssignment}\n${factoryBinding}`
-      );
+      mod.modResults.contents = mod.modResults.contents.replace(factoryAssignment, `${factoryAssignment}\n${factoryBinding}`);
     }
 
     return mod;

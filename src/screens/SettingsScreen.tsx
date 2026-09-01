@@ -1,8 +1,3 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, useColorScheme, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   CalendarDays,
   CheckCircle2,
@@ -20,29 +15,44 @@ import {
   X,
   XCircle
 } from "lucide-react-native";
-import { Text } from "../components/ui/text";
+import { type ComponentType, type ReactNode, useEffect, useMemo, useState } from "react";
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, useColorScheme, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  Easing as ReanimatedEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackupProgressDialog, type BackupProgressDialogPalette } from "../components/backup/BackupProgressDialog";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
 import { NativeDivider } from "../components/native/NativeDivider";
 import { NativeProgress } from "../components/native/NativeProgress";
-import { NativeSettingsScreen, isNativeSettingsScreenAvailable, type SettingsNativeAction } from "../components/native/NativeSettingsScreen";
+import { isNativeSettingsScreenAvailable, NativeSettingsScreen, type SettingsNativeAction } from "../components/native/NativeSettingsScreen";
 import { NativeSwitch } from "../components/native/NativeSwitch";
-import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
-import { YearSelectorDrawer, getFiscalYearLabel, type YearSelectorPalette } from "../components/year-selector-drawer";
+import { Text } from "../components/ui/text";
+import { getFiscalYearLabel, YearSelectorDrawer, type YearSelectorPalette } from "../components/year-selector-drawer";
 import { clearAllLocalData } from "../db/database";
 import { getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import { getCurrentLocalIsoDate, getCurrentLocalYear } from "../lib/utils";
 import {
   clearGoogleAccessToken,
+  GoogleLoginRequiredError,
   getGoogleAccountProfile,
   getGoogleDriveAuthSetup,
   getGoogleDriveConnectionState,
-  GoogleLoginRequiredError,
   storeGoogleAuthResult,
   useGoogleDriveAuthRequest
 } from "../services/auth/googleAuth";
-import { listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile, type BackupProgress } from "../services/backup/driveBackup";
+import { type BackupProgress, listDriveBackups, restoreLatestDriveBackup, uploadBackupToDrive, writeLocalBackupFile } from "../services/backup/driveBackup";
 import { exportLocationCsv } from "../services/export/csvExport";
-import { stopBackgroundTracking } from "../services/tracking/locationTracking";
+import { cleanupLocalArtifacts } from "../services/privacy/localArtifacts";
+import { clearPendingNativeLocationEvents, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 
 const appearanceOptions = [
@@ -289,7 +299,7 @@ export function SettingsScreen() {
   function confirmClearDataAndLogout() {
     Alert.alert(
       "Clear data and logout?",
-      "This permanently deletes local travel history, trips, pending validation, settings, backup metadata, and the saved Google token on this device, then returns to onboarding. Google Drive backups are not deleted.",
+      "This permanently deletes local travel history, trips, pending validation, generated exports, settings, backup metadata, and the saved Google token on this device, then returns to onboarding. Google Drive backups are not deleted.",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Clear & Logout", style: "destructive", onPress: () => void clearDataAndLogout() }
@@ -340,6 +350,8 @@ export function SettingsScreen() {
 
   async function clearDeviceAndReturnToOnboarding(successMessage: string) {
     await stopBackgroundTracking();
+    await clearPendingNativeLocationEvents();
+    await cleanupLocalArtifacts();
     await clearGoogleAccessToken();
     await clearAllLocalData();
     setBackupStatus({ tone: "success", message: successMessage });
@@ -406,11 +418,7 @@ export function SettingsScreen() {
           onCloudBackupEnabledChange={(value: boolean) => void updateSetting("cloudBackupEnabled", value)}
           onResidencyConfirm={(year: number, calendarYearMode: boolean) => void applyResidencySettings(year, calendarYearMode)}
         />
-        <BackupProgressDialog
-          palette={getBackupProgressDialogPalette(palette)}
-          progress={backupProgress}
-          visible={Boolean(backupProgress)}
-        />
+        <BackupProgressDialog palette={getBackupProgressDialogPalette(palette)} progress={backupProgress} visible={Boolean(backupProgress)} />
         <YearSelectorDrawer
           calendarYearMode={draftCalendarYearMode}
           palette={getSettingsYearSelectorPalette(palette)}
@@ -537,7 +545,14 @@ export function SettingsScreen() {
               onPress={() => void saveLocalBackup()}
             />
             <SettingsDivider palette={palette} />
-            <SettingsRow Icon={LogOut} destructive detail={googleConnection.isConnected ? "Remove saved token" : "No account connected"} palette={palette} title="Disconnect Google" onPress={() => void disconnectGoogleDrive()} />
+            <SettingsRow
+              Icon={LogOut}
+              destructive
+              detail={googleConnection.isConnected ? "Remove saved token" : "No account connected"}
+              palette={palette}
+              title="Disconnect Google"
+              onPress={() => void disconnectGoogleDrive()}
+            />
             <SettingsDivider palette={palette} />
             <SettingsRow
               Icon={CloudUpload}
@@ -563,13 +578,25 @@ export function SettingsScreen() {
 
         <SettingsSection palette={palette} title="Fiscal Year">
           <SettingsGroup palette={palette}>
-            <SettingsRow Icon={CalendarDays} detail={getResidencyYearDetail(settings.residencyYearEnd, settings.calendarYearMode)} palette={palette} title="Residency Year" onPress={openResidencyDrawer} />
+            <SettingsRow
+              Icon={CalendarDays}
+              detail={getResidencyYearDetail(settings.residencyYearEnd, settings.calendarYearMode)}
+              palette={palette}
+              title="Residency Year"
+              onPress={openResidencyDrawer}
+            />
           </SettingsGroup>
         </SettingsSection>
 
         <SettingsSection palette={palette} title="Appearance">
           <SettingsGroup palette={palette}>
-            <SettingsRow Icon={Monitor} detail={getAppearanceLabel(settings.appearance)} palette={palette} title="Theme" onPress={() => setActiveDrawer("appearance")} />
+            <SettingsRow
+              Icon={Monitor}
+              detail={getAppearanceLabel(settings.appearance)}
+              palette={palette}
+              title="Theme"
+              onPress={() => setActiveDrawer("appearance")}
+            />
           </SettingsGroup>
         </SettingsSection>
       </ScrollView>
@@ -596,11 +623,7 @@ export function SettingsScreen() {
           void updateSetting("appearance", value as typeof settings.appearance);
         }}
       />
-      <BackupProgressDialog
-        palette={getBackupProgressDialogPalette(palette)}
-        progress={backupProgress}
-        visible={Boolean(backupProgress)}
-      />
+      <BackupProgressDialog palette={getBackupProgressDialogPalette(palette)} progress={backupProgress} visible={Boolean(backupProgress)} />
     </>
   );
 }
@@ -648,7 +671,13 @@ function SettingsRow({
         <Icon size={24} color={iconColor} strokeWidth={iconStrokeWidth} />
       </View>
       <View style={styles.rowCopy}>
-        <Text className="text-base font-semibold leading-[22px]" adjustsFontSizeToFit minimumFontScale={0.74} numberOfLines={1} style={[styles.rowTitle, { color: titleColor }]}>
+        <Text
+          className="text-base font-semibold leading-[22px]"
+          adjustsFontSizeToFit
+          minimumFontScale={0.74}
+          numberOfLines={1}
+          style={[styles.rowTitle, { color: titleColor }]}
+        >
           {title}
         </Text>
         {detail ? (
@@ -663,12 +692,7 @@ function SettingsRow({
 
   if (onPress) {
     return (
-      <Pressable
-        accessibilityRole="button"
-        disabled={disabled}
-        style={disabled ? styles.disabledRow : null}
-        onPress={onPress}
-      >
+      <Pressable accessibilityRole="button" disabled={disabled} style={disabled ? styles.disabledRow : null} onPress={onPress}>
         <View style={styles.row}>
           <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={42} tint="systemUltraThinMaterial" style={styles.rowGlassLayer} />
           <View pointerEvents="none" style={[styles.rowGlassOverlay, { backgroundColor: palette.control, borderColor: palette.controlBorder }]} />
@@ -782,7 +806,13 @@ function SettingsDrawerShell({
               drawerStyle
             ]}
           >
-            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={78} tint="systemThinMaterial" style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+            <LiquidGlassLayer
+              colorScheme="auto"
+              glassStyle="regular"
+              intensity={78}
+              tint="systemThinMaterial"
+              style={[StyleSheet.absoluteFill, styles.noPointerEvents]}
+            />
             <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.drawer }]} />
             <View style={styles.drawerHandleTouchArea}>
               <View style={[styles.drawerHandle, { backgroundColor: palette.drawerHandle }]} />
@@ -835,8 +865,21 @@ function ChoiceSettingsDrawer({
             {detail}
           </Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss ${title}`} hitSlop={8} style={[styles.drawerCloseButton, { backgroundColor: palette.control }]} onPress={onClose}>
-          <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={44} tint="systemUltraThinMaterial" tintColor={palette.control} style={StyleSheet.absoluteFill} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Dismiss ${title}`}
+          hitSlop={8}
+          style={[styles.drawerCloseButton, { backgroundColor: palette.control }]}
+          onPress={onClose}
+        >
+          <LiquidGlassLayer
+            colorScheme="auto"
+            glassStyle="regular"
+            intensity={44}
+            tint="systemUltraThinMaterial"
+            tintColor={palette.control}
+            style={StyleSheet.absoluteFill}
+          />
           <X size={18} color={palette.muted} strokeWidth={iconStrokeWidth} />
         </Pressable>
       </View>
@@ -861,7 +904,14 @@ function ChoiceTabs({
 }) {
   return (
     <View style={[styles.choiceTabs, { backgroundColor: palette.choiceTabsTrack, borderColor: palette.choiceTabsBorder }]}>
-      <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={46} tint="systemUltraThinMaterial" tintColor={palette.control} style={StyleSheet.absoluteFill} />
+      <LiquidGlassLayer
+        colorScheme="auto"
+        glassStyle="regular"
+        intensity={46}
+        tint="systemUltraThinMaterial"
+        tintColor={palette.control}
+        style={StyleSheet.absoluteFill}
+      />
       {options.map((option, index) => {
         const selected = index === selectedIndex;
         const OptionIcon = option.Icon;
@@ -875,7 +925,9 @@ function ChoiceTabs({
             style={[styles.choiceTab, selected && { backgroundColor: palette.choiceTabsActive, borderColor: palette.choiceTabsActiveBorder }]}
             onPress={() => onSelect(option.value ?? selectedValue)}
           >
-            {OptionIcon ? <OptionIcon size={22} color={selected ? palette.choiceTabsSelectedText : palette.choiceTabsMutedText} strokeWidth={iconStrokeWidth} /> : null}
+            {OptionIcon ? (
+              <OptionIcon size={22} color={selected ? palette.choiceTabsSelectedText : palette.choiceTabsMutedText} strokeWidth={iconStrokeWidth} />
+            ) : null}
             <Text
               className="text-xs font-semibold leading-[17px]"
               adjustsFontSizeToFit

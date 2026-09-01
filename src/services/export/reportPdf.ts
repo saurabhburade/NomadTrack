@@ -1,12 +1,13 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import { Platform } from "react-native";
-import { readDayRecordsForDateRange, type DayRecordRow } from "../../db/database";
 import { countryBoundaries } from "../../data/countryBoundaries";
+import { type DayRecordRow, readDayRecordsForDateRange } from "../../db/database";
+import type { AppSettings } from "../../types/models";
 import { formatResidencyYearLabel, getResidencyYearWindow } from "../calculations/residencyYear";
 import { showReportReadyNotification } from "../notifications/statusNotifications";
+import { localArtifactNames } from "../privacy/localArtifacts";
 import { openPdfFile } from "./pdfOpen";
-import type { AppSettings } from "../../types/models";
 
 export type ReportKind = "monthly" | "calendar" | "fiscal";
 
@@ -83,20 +84,7 @@ export type TravelReportPreview = {
 
 const countryColors = ["#6ee7b7", "#93c5fd", "#fbbf24", "#fda4af", "#c4b5fd", "#67e8f9", "#fdba74"];
 const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const longMonthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-];
+const longMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export async function createTravelReportPdf({
   kind,
@@ -176,7 +164,7 @@ export async function shareTravelReportPdf(report: TravelReportPreview, isDark =
     height: 842,
     margins: { top: 24, right: 24, bottom: 24, left: 24 }
   });
-  const uri = await moveReportFile(printed.uri, `${report.period.title} ${report.period.label}`);
+  const uri = await moveReportFile(printed.uri, report.period.kind, report.period.label);
   let didShare = false;
   await showReportReadyNotification(title, uri);
 
@@ -478,7 +466,9 @@ function summarizeRecords(period: ReportPeriod, records: DayRecordRow[]): Report
 
   const trackedDays = indiaDays + outsideIndiaDays;
   const countryTotals: CountryTotal[] = [];
-  countryTotalsByCode.forEach((row) => countryTotals.push(row));
+  countryTotalsByCode.forEach((row) => {
+    countryTotals.push(row);
+  });
   countryTotals.sort((a, b) => b.days - a.days || a.countryName.localeCompare(b.countryName));
 
   return {
@@ -534,7 +524,7 @@ function calendarDots(report: TravelReportPreview, colors: ReturnType<typeof get
             ${month.slots
               .map((slot) => {
                 if (!slot.date) return `<div class="dot" style="background: transparent;"></div>`;
-                const color = slot.countryCode ? colorByCountry.get(slot.countryCode) ?? countryColors[6]! : colors.track;
+                const color = slot.countryCode ? (colorByCountry.get(slot.countryCode) ?? countryColors[6]!) : colors.track;
                 return `<div class="dot" title="${escapeHtml(slot.date)}" style="background: ${color};"></div>`;
               })
               .join("")}
@@ -675,7 +665,13 @@ function interpolateHexColor(start: string, end: string, progress: number) {
 
 function parseHexColor(value: string) {
   const normalized = value.replace("#", "");
-  const expanded = normalized.length === 3 ? normalized.split("").map((char) => char + char).join("") : normalized;
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const number = Number.parseInt(expanded, 16);
   return {
     b: number & 255,
@@ -870,11 +866,11 @@ function parseIsoDateParts(date: string) {
   };
 }
 
-async function moveReportFile(uri: string, title: string) {
+async function moveReportFile(uri: string, kind: ReportKind, label: string) {
   const directory = FileSystem.documentDirectory;
   if (!directory) return uri;
 
-  const targetUri = `${directory}${sanitizeFileName(title)}.pdf`;
+  const targetUri = `${directory}${localArtifactNames.report(kind, label)}`;
   try {
     const existing = await FileSystem.getInfoAsync(targetUri);
     if (existing.exists) {
@@ -887,21 +883,8 @@ async function moveReportFile(uri: string, title: string) {
   }
 }
 
-function sanitizeFileName(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function getReportColors(isDark: boolean) {

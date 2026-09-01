@@ -5,11 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/nomadtrack-icon.png",
-    "scheme": [
-      "exp+travel-nri-tracker",
-      "travelnritracker",
-      "com.googleusercontent.apps.564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i"
-    ],
+    "scheme": ["exp+travel-nri-tracker", "travelnritracker", "com.googleusercontent.apps.564359005029-bakk2n7v4vpu84ln6s2kmgdjpvvip39i"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

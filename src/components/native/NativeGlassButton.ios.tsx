@@ -1,4 +1,4 @@
-import { Pressable, requireNativeComponent, StyleSheet, Text, UIManager, type ColorValue, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, requireNativeComponent, type StyleProp, StyleSheet, Text, UIManager, type ViewProps, type ViewStyle } from "react-native";
 
 type NativeGlassButtonShape = "capsule" | "circle" | "roundedRectangle";
 type NativeGlassButtonFontWeight = "regular" | "medium" | "semibold" | "bold" | "heavy";
@@ -55,9 +55,7 @@ export function NativeGlassButton({
         style={[styles.fallbackButton, shape === "roundedRectangle" && styles.fallbackRoundedRectangle, disabled && styles.disabled, style]}
         onPress={onPress}
       >
-        <Text style={[styles.fallbackLabel, { color: tint, fontSize, fontWeight: fallbackFontWeight(fontWeight) }]}>
-          {label}
-        </Text>
+        <Text style={[styles.fallbackLabel, { color: tint, fontSize, fontWeight: fallbackFontWeight(fontWeight) }]}>{label}</Text>
       </Pressable>
     );
   }

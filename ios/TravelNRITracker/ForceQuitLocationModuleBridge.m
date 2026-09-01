@@ -16,4 +16,7 @@ RCT_EXTERN_METHOD(markLocationEventsProcessed:(NSArray *)ids
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(clearPendingLocationEvents:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end

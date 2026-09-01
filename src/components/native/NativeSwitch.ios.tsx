@@ -1,5 +1,5 @@
 import { Host, Switch as SwiftSwitch } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativeSwitchProps = {
   disabled?: boolean;
@@ -16,11 +16,7 @@ export function NativeSwitch({ disabled = false, onColor, style, value, onValueC
   return (
     <View pointerEvents={disabled ? "none" : "auto"} style={[styles.shell, disabled && styles.disabled, style]}>
       <Host matchContents>
-        <SwiftSwitch
-          color={String(onColor)}
-          value={value}
-          onValueChange={onValueChange}
-        />
+        <SwiftSwitch color={String(onColor)} value={value} onValueChange={onValueChange} />
       </Host>
     </View>
   );

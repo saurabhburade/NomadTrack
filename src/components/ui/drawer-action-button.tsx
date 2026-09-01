@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View, type ColorValue, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, type ColorValue, type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { NativeButton } from "../native/NativeButton";
 
 const ACTION_BUTTON_HEIGHT = 42;
@@ -21,7 +21,17 @@ function colorString(color: ColorValue) {
   return String(color);
 }
 
-export function DrawerActionButton({ backgroundColor, borderColor, disabled, foregroundColor, loading, style, systemImage, title, onPress }: DrawerActionButtonProps) {
+export function DrawerActionButton({
+  backgroundColor,
+  borderColor,
+  disabled,
+  foregroundColor,
+  loading,
+  style,
+  systemImage,
+  title,
+  onPress
+}: DrawerActionButtonProps) {
   const [buttonWidth, setButtonWidth] = useState<number>();
   const buttonBackgroundColor = colorString(backgroundColor);
   const buttonBorderColor = colorString(borderColor);
@@ -29,7 +39,9 @@ export function DrawerActionButton({ backgroundColor, borderColor, disabled, for
   const isProminent = !isDestructive && buttonBackgroundColor === buttonBorderColor;
   const lowerTitle = title.toLowerCase();
   const role = isDestructive ? "destructive" : lowerTitle === "cancel" || lowerTitle === "close" ? "cancel" : "default";
-  const frame = buttonWidth ? { width: Math.max(0, buttonWidth - ACTION_BUTTON_HORIZONTAL_INSET * 2), height: ACTION_BUTTON_HEIGHT } : { minHeight: ACTION_BUTTON_HEIGHT, maxWidth: 10000 };
+  const frame = buttonWidth
+    ? { width: Math.max(0, buttonWidth - ACTION_BUTTON_HORIZONTAL_INSET * 2), height: ACTION_BUTTON_HEIGHT }
+    : { minHeight: ACTION_BUTTON_HEIGHT, maxWidth: 10000 };
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = Math.round(event.nativeEvent.layout.width);
     if (nextWidth > 0) {
@@ -41,7 +53,13 @@ export function DrawerActionButton({ backgroundColor, borderColor, disabled, for
 
   return (
     <View style={[styles.button, isDisabled ? styles.disabled : null, style]} onLayout={handleLayout}>
-      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={isDisabled} style={[styles.edgeTapTarget, styles.leftEdgeTapTarget]} onPress={onPress} />
+      <Pressable
+        accessibilityLabel={title}
+        accessibilityRole="button"
+        disabled={isDisabled}
+        style={[styles.edgeTapTarget, styles.leftEdgeTapTarget]}
+        onPress={onPress}
+      />
       <NativeButton
         accessibilityLabel={title}
         color={isProminent ? backgroundColor : foregroundColor}
@@ -58,7 +76,13 @@ export function DrawerActionButton({ backgroundColor, borderColor, disabled, for
         onPress={onPress}
       />
       {loading ? <ActivityIndicator color={String(foregroundColor)} size="small" style={styles.loadingIndicator} /> : null}
-      <Pressable accessibilityLabel={title} accessibilityRole="button" disabled={isDisabled} style={[styles.edgeTapTarget, styles.rightEdgeTapTarget]} onPress={onPress} />
+      <Pressable
+        accessibilityLabel={title}
+        accessibilityRole="button"
+        disabled={isDisabled}
+        style={[styles.edgeTapTarget, styles.rightEdgeTapTarget]}
+        onPress={onPress}
+      />
     </View>
   );
 }

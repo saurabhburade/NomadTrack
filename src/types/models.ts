@@ -1,4 +1,15 @@
-export type LocationSource = "gps" | "gps_offline" | "manual" | "photo" | "import" | "visit" | "slc" | "region-exit" | "region-enter" | "shortcuts" | "charger-connected";
+export type LocationSource =
+  | "gps"
+  | "gps_offline"
+  | "manual"
+  | "photo"
+  | "import"
+  | "visit"
+  | "slc"
+  | "region-exit"
+  | "region-enter"
+  | "shortcuts"
+  | "charger-connected";
 export type ReverseGeocodeStatus = "pending" | "done" | "failed";
 export type GeocodeJobStatus = "pending" | "processing" | "done" | "failed";
 export type TrackingIntervalHours = "1m" | 1 | 2 | 4 | 8 | "manual";

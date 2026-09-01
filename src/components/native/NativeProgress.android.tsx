@@ -1,5 +1,5 @@
 import { CircularProgress, LinearProgress } from "@expo/ui/jetpack-compose";
-import { type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import type { ColorValue, StyleProp, ViewStyle } from "react-native";
 
 type NativeProgressProps = {
   color?: ColorValue;

@@ -14,11 +14,11 @@ import {
   updateManualDayEntry,
   writeSetting
 } from "../db/database";
+import { getCurrentLocalIsoDate } from "../lib/utils";
 import { syncBackgroundBackupRegistration } from "../services/backup/backgroundBackupTask";
 import { processGeocodeQueue } from "../services/geocoding/geocodeQueue";
 import { drainPendingShortcutsLocationEvents, resumeBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
 import type { AppSettings, DashboardSummary, LocationPoint, Trip } from "../types/models";
-import { getCurrentLocalIsoDate } from "../lib/utils";
 
 export type DayRecordPreview = {
   date: string;

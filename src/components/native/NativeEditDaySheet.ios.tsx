@@ -1,12 +1,4 @@
-import {
-  requireNativeComponent,
-  StyleSheet,
-  UIManager,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
+import { type NativeSyntheticEvent, requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 import type { NativeEditDaySheetCountry, NativeEditDaySheetPalette } from "./NativeEditDaySheet";
 
 type ConfirmEvent = NativeSyntheticEvent<{
@@ -58,20 +50,13 @@ type NativeEditDaySheetProps = {
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
-  onConfirm: (entry: {
-    originalDate: string;
-    date: string;
-    countryCode: string;
-    countryName: string;
-  }) => void;
+  onConfirm: (entry: { originalDate: string; date: string; countryCode: string; countryName: string }) => void;
   onDelete: (date: string) => void;
 };
 
 export const isNativeEditDaySheetAvailable = UIManager.getViewManagerConfig?.("EditDaySheetView") != null;
 
-const EditDaySheetView = isNativeEditDaySheetAvailable
-  ? requireNativeComponent<NativeEditDaySheetViewProps>("EditDaySheetView")
-  : null;
+const EditDaySheetView = isNativeEditDaySheetAvailable ? requireNativeComponent<NativeEditDaySheetViewProps>("EditDaySheetView") : null;
 
 export function NativeEditDaySheet({
   canDelete,

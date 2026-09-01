@@ -1,6 +1,6 @@
 import { Check, ChevronLeft, ChevronRight, ExternalLink, Plus, Share, Trash2 } from "lucide-react-native";
-import { type ComponentType } from "react";
-import { Pressable, StyleSheet, Text, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import type { ComponentType } from "react";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { iconStrokeWidth } from "../../lib/colors";
 
 type NativeButtonProps = {
@@ -42,7 +42,20 @@ function iconForSystemImage(systemImage?: string): ButtonIcon | null {
   }
 }
 
-export function NativeButton({ accessibilityLabel, color, disabled, foregroundColor, frame, fullWidth, role = "default", style, systemImage, title, variant = "bordered", onPress }: NativeButtonProps) {
+export function NativeButton({
+  accessibilityLabel,
+  color,
+  disabled,
+  foregroundColor,
+  frame,
+  fullWidth,
+  role = "default",
+  style,
+  systemImage,
+  title,
+  variant = "bordered",
+  onPress
+}: NativeButtonProps) {
   const prominent = variant === "borderedProminent" || variant === "glassProminent";
   const Icon = iconForSystemImage(systemImage);
   const labelColor = foregroundColor ? String(foregroundColor) : prominent ? "#ffffff" : String(color ?? "#111111");
@@ -102,5 +115,5 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: "700"
-  },
+  }
 });

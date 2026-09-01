@@ -5,10 +5,7 @@ export type ResidencyYearWindow = {
   endDate: string;
 };
 
-type ResidencyYearSettings = Pick<
-  AppSettings,
-  "calendarYearMode" | "fiscalYearStartDay" | "fiscalYearStartMonth" | "residencyYearEnd"
->;
+type ResidencyYearSettings = Pick<AppSettings, "calendarYearMode" | "fiscalYearStartDay" | "fiscalYearStartMonth" | "residencyYearEnd">;
 
 export function getResidencyYearWindow(settings: ResidencyYearSettings, fallbackYear = new Date().getUTCFullYear()): ResidencyYearWindow {
   const endYear = settings.residencyYearEnd || fallbackYear;

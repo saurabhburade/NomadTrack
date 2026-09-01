@@ -19,12 +19,7 @@ export function resolveCountryFromBoundaries(latitude: number, longitude: number
 
 function isInsideBbox(latitude: number, longitude: number, bbox: number[]) {
   const [minLongitude, minLatitude, maxLongitude, maxLatitude] = bbox;
-  if (
-    minLongitude === undefined ||
-    minLatitude === undefined ||
-    maxLongitude === undefined ||
-    maxLatitude === undefined
-  ) {
+  if (minLongitude === undefined || minLatitude === undefined || maxLongitude === undefined || maxLatitude === undefined) {
     return false;
   }
 
@@ -43,27 +38,15 @@ function isPointInPolygon(latitude: number, longitude: number, polygon: Array<[n
 
     const intersects =
       currentLatitude > latitude !== previousLatitude > latitude &&
-      longitude <
-        ((previousLongitude - currentLongitude) * (latitude - currentLatitude)) /
-          (previousLatitude - currentLatitude) +
-          currentLongitude;
+      longitude < ((previousLongitude - currentLongitude) * (latitude - currentLatitude)) / (previousLatitude - currentLatitude) + currentLongitude;
     if (intersects) inside = !inside;
   }
 
   return inside;
 }
 
-function isPointOnSegment(
-  latitude: number,
-  longitude: number,
-  startLatitude: number,
-  startLongitude: number,
-  endLatitude: number,
-  endLongitude: number
-) {
-  const cross =
-    (longitude - startLongitude) * (endLatitude - startLatitude) -
-    (latitude - startLatitude) * (endLongitude - startLongitude);
+function isPointOnSegment(latitude: number, longitude: number, startLatitude: number, startLongitude: number, endLatitude: number, endLongitude: number) {
+  const cross = (longitude - startLongitude) * (endLatitude - startLatitude) - (latitude - startLatitude) * (endLongitude - startLongitude);
   if (Math.abs(cross) > coordinateEpsilon) return false;
 
   const minLatitude = Math.min(startLatitude, endLatitude) - coordinateEpsilon;

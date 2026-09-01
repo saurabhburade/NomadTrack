@@ -1,5 +1,5 @@
-import { BlurView, type BlurTint } from "expo-blur";
-import { StyleSheet, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type BlurTint, BlurView } from "expo-blur";
+import { type ColorValue, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
 
 type LiquidGlassLayerProps = {
   colorScheme?: "auto" | "light" | "dark";

@@ -21,16 +21,8 @@ export function NativeManualEntrySheet(_props: {
   style?: StyleProp<ViewStyle>;
   visible: boolean;
   onClose: () => void;
-  onClear: (entry: {
-    startDate: string;
-    endDate: string;
-  }) => void;
-  onConfirm: (entry: {
-    startDate: string;
-    endDate: string;
-    countryCode: string;
-    countryName: string;
-  }) => void;
+  onClear: (entry: { startDate: string; endDate: string }) => void;
+  onConfirm: (entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) => void;
 }) {
   return null;
 }

@@ -1,4 +1,4 @@
-import { requireNativeComponent, StyleSheet, UIManager, type NativeSyntheticEvent, type ViewProps } from "react-native";
+import { type NativeSyntheticEvent, requireNativeComponent, StyleSheet, UIManager, type ViewProps } from "react-native";
 
 export type NativeMonthYearSheetPalette = {
   foreground: string;
@@ -41,9 +41,7 @@ type NativeMonthYearSheetProps = {
 
 export const isNativeMonthYearSheetAvailable = UIManager.getViewManagerConfig?.("MonthYearSheetView") != null;
 
-const MonthYearSheetView = isNativeMonthYearSheetAvailable
-  ? requireNativeComponent<NativeMonthYearSheetViewProps>("MonthYearSheetView")
-  : null;
+const MonthYearSheetView = isNativeMonthYearSheetAvailable ? requireNativeComponent<NativeMonthYearSheetViewProps>("MonthYearSheetView") : null;
 
 export function NativeMonthYearSheet({ monthIndex, palette, visible, year, onClose, onConfirm }: NativeMonthYearSheetProps) {
   if (!MonthYearSheetView) return null;

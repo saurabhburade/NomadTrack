@@ -1,12 +1,4 @@
-import {
-  requireNativeComponent,
-  StyleSheet,
-  UIManager,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
+import { type NativeSyntheticEvent, requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 
 export type NativeResidencyYearSheetPalette = {
   foreground: string;
@@ -52,9 +44,7 @@ type NativeResidencyYearSheetProps = {
 
 export const isNativeResidencyYearSheetAvailable = UIManager.getViewManagerConfig?.("ResidencyYearSheetView") != null;
 
-const ResidencyYearSheetView = isNativeResidencyYearSheetAvailable
-  ? requireNativeComponent<NativeResidencyYearSheetViewProps>("ResidencyYearSheetView")
-  : null;
+const ResidencyYearSheetView = isNativeResidencyYearSheetAvailable ? requireNativeComponent<NativeResidencyYearSheetViewProps>("ResidencyYearSheetView") : null;
 
 export function NativeResidencyYearSheet({ calendarYearMode, palette, style, visible, year, onClose, onConfirm }: NativeResidencyYearSheetProps) {
   if (!ResidencyYearSheetView) return null;

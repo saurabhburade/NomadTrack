@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type BottomTabBarProps, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { CalendarDays, ChartPie, Map as MapIcon, Settings as SettingsIcon } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, useColorScheme, View } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing as ReanimatedEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { Easing as ReanimatedEasing, cancelAnimation, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
-import { DashboardScreen } from "../screens/DashboardScreen";
-import { CalendarScreen } from "../screens/CalendarScreen";
-import { MapScreen } from "../screens/MapScreen";
-import { TripsScreen } from "../screens/TripsScreen";
-import { SettingsScreen } from "../screens/SettingsScreen";
-import { YearOverviewScreen } from "../screens/YearOverviewScreen";
 import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
+import { CalendarScreen } from "../screens/CalendarScreen";
+import { DashboardScreen } from "../screens/DashboardScreen";
+import { MapScreen } from "../screens/MapScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
+import { TripsScreen } from "../screens/TripsScreen";
+import { YearOverviewScreen } from "../screens/YearOverviewScreen";
 import { useAppStore } from "../store/appStore";
 
 export type RootTabParamList = {
@@ -184,10 +193,7 @@ function LiquidGlassTabBar({ state, descriptors, navigation, isDark, onRouteChan
     return {
       opacity: itemWidth > 0 ? 1 : 0,
       width: Math.max(itemWidth - tabIndicatorInset * 2, 0),
-      transform: [
-        { translateX: tabBarPadding + activeIndex.value * itemWidth + tabIndicatorInset },
-        { scaleX: stretch }
-      ]
+      transform: [{ translateX: tabBarPadding + activeIndex.value * itemWidth + tabIndicatorInset }, { scaleX: stretch }]
     };
   }, [itemWidth]);
 
@@ -204,7 +210,12 @@ function LiquidGlassTabBar({ state, descriptors, navigation, isDark, onRouteChan
         }
       ]}
     >
-      <LiquidGlassLayer colorScheme={isDark ? "dark" : "light"} glassStyle="regular" intensity={98} tint={isDark ? "systemChromeMaterialDark" : "systemChromeMaterialLight"} />
+      <LiquidGlassLayer
+        colorScheme={isDark ? "dark" : "light"}
+        glassStyle="regular"
+        intensity={98}
+        tint={isDark ? "systemChromeMaterialDark" : "systemChromeMaterialLight"}
+      />
       <Animated.View
         pointerEvents="none"
         style={[

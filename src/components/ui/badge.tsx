@@ -1,6 +1,6 @@
 import { View } from "react-native";
-import { Text } from "./text";
 import { cn } from "../../lib/utils";
+import { Text } from "./text";
 
 type BadgeProps = {
   label: string;

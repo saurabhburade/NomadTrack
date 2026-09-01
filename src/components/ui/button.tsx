@@ -1,34 +1,31 @@
-import { type ComponentProps, type ReactNode } from "react";
-import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Text } from "./text";
+import type { ComponentProps, ReactNode } from "react";
+import { Pressable, type PressableProps, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { cn } from "../../lib/utils";
 import { LiquidGlassLayer } from "../native/LiquidGlassLayer";
+import { Text } from "./text";
 
-export const buttonVariants = cva(
-  "h-11 flex-row items-center justify-center gap-2 rounded-lg border px-4 active:opacity-80 disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "border-primary bg-primary",
-        secondary: "border-secondary bg-secondary",
-        outline: "border-border bg-card",
-        ghost: "border-transparent bg-transparent",
-        destructive: "border-destructive bg-destructive"
-      },
-      size: {
-        default: "h-11 px-4",
-        sm: "h-9 px-3",
-        lg: "h-12 px-5",
-        icon: "h-11 w-11 px-0"
-      }
+export const buttonVariants = cva("h-11 flex-row items-center justify-center gap-2 rounded-lg border px-4 active:opacity-80 disabled:opacity-50", {
+  variants: {
+    variant: {
+      default: "border-primary bg-primary",
+      secondary: "border-secondary bg-secondary",
+      outline: "border-border bg-card",
+      ghost: "border-transparent bg-transparent",
+      destructive: "border-destructive bg-destructive"
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default"
+    size: {
+      default: "h-11 px-4",
+      sm: "h-9 px-3",
+      lg: "h-12 px-5",
+      icon: "h-11 w-11 px-0"
     }
+  },
+  defaultVariants: {
+    variant: "default",
+    size: "default"
   }
-);
+});
 
 const textVariants = cva("text-xs font-semibold", {
   variants: {

@@ -1,5 +1,5 @@
 import { TextInput } from "@expo/ui/jetpack-compose";
-import { type StyleProp, type ViewStyle } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 
 type NativeTextInputProps = {
   defaultValue?: string;

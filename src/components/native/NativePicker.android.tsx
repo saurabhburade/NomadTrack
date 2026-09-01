@@ -1,5 +1,5 @@
 import { Picker as ComposePicker } from "@expo/ui/jetpack-compose";
-import { type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import type { ColorValue, StyleProp, ViewStyle } from "react-native";
 
 type NativePickerVariant = "segmented" | "menu" | "inline" | "wheel" | "palette" | "radio";
 

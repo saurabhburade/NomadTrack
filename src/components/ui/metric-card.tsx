@@ -1,9 +1,9 @@
-import { type ComponentType } from "react";
+import type { LucideProps } from "lucide-react-native";
+import type { ComponentType } from "react";
 import { View } from "react-native";
-import { type LucideProps } from "lucide-react-native";
+import { iconStrokeWidth } from "../../lib/colors";
 import { Card } from "./card";
 import { Text } from "./text";
-import { iconStrokeWidth } from "../../lib/colors";
 
 type MetricCardProps = {
   label: string;

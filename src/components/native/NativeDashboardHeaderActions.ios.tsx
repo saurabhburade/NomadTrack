@@ -1,20 +1,20 @@
 import type { ButtonProps as SwiftButtonProps } from "@expo/ui/swift-ui";
 import { ChevronLeft } from "lucide-react-native";
 import {
+  type ColorValue,
+  type NativeSyntheticEvent,
   Pressable,
   requireNativeComponent,
+  type StyleProp,
   StyleSheet,
   UIManager,
   View,
-  type ColorValue,
-  type NativeSyntheticEvent,
-  type StyleProp,
   type ViewProps,
   type ViewStyle
 } from "react-native";
+import { iconStrokeWidth } from "../../lib/colors";
 import { BlurReplaceText } from "../ui/blur-replace-text";
 import { NativeMenu } from "./NativeMenu";
-import { iconStrokeWidth } from "../../lib/colors";
 
 const YEAR_BUTTON_WIDTH = 108;
 const MENU_BUTTON_SIZE = 48;
@@ -57,7 +57,15 @@ type DashboardToolbarViewProps = ViewProps & {
 const hasDashboardToolbarView = UIManager.getViewManagerConfig?.("DashboardToolbarView") != null;
 const DashboardToolbarView = hasDashboardToolbarView ? requireNativeComponent<DashboardToolbarViewProps>("DashboardToolbarView") : null;
 
-export function NativeDashboardHeaderActions({ accessibilityLabel, color, fiscalYearLabel, menuActions, style, trailingAction, onYearPress }: NativeDashboardHeaderActionsProps) {
+export function NativeDashboardHeaderActions({
+  accessibilityLabel,
+  color,
+  fiscalYearLabel,
+  menuActions,
+  style,
+  trailingAction,
+  onYearPress
+}: NativeDashboardHeaderActionsProps) {
   const tint = color ? String(color) : "#111111";
 
   if (!DashboardToolbarView) {
@@ -67,7 +75,12 @@ export function NativeDashboardHeaderActions({ accessibilityLabel, color, fiscal
           <BlurReplaceText value={fiscalYearLabel} style={[styles.yearLabel, { color: tint }]} />
         </Pressable>
         {trailingAction ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={trailingAction.accessibilityLabel} style={styles.iconButton} onPress={trailingAction.onPress}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={trailingAction.accessibilityLabel}
+            style={styles.iconButton}
+            onPress={trailingAction.onPress}
+          >
             <ChevronLeft size={27} color={tint} strokeWidth={iconStrokeWidth} />
           </Pressable>
         ) : (

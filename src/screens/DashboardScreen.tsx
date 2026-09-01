@@ -1,38 +1,58 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Alert, AppState, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share as NativeShare, StyleSheet, useColorScheme, View, type StyleProp, type ViewStyle } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useRouter } from "expo-router";
 import { BlurView } from "expo-blur";
+import { useRouter } from "expo-router";
+import { AlertTriangle, Banknote, CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MoreHorizontal, RefreshCw, Share } from "lucide-react-native";
+import { type ComponentType, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
-  Banknote,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  FileText,
-  MoreHorizontal,
-  RefreshCw,
-  Share
-} from "lucide-react-native";
+  Alert,
+  AppState,
+  Linking,
+  Modal,
+  Share as NativeShare,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  type StyleProp,
+  StyleSheet,
+  useColorScheme,
+  View,
+  type ViewStyle
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  Easing as ReanimatedEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text } from "../components/ui/text";
-import { BlurReplaceText } from "../components/ui/blur-replace-text";
-import { DrawerActionButton } from "../components/ui/drawer-action-button";
+import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
+import { isNativeAutomationGuideSheetAvailable, NativeAutomationGuideSheet } from "../components/native/NativeAutomationGuideSheet";
 import { NativeDashboardHeaderActions } from "../components/native/NativeDashboardHeaderActions";
 import { NativeGlassButton } from "../components/native/NativeGlassButton";
+import { isNativeReportPreviewSheetAvailable, NativeReportPreviewSheet } from "../components/native/NativeReportPreviewSheet";
+import { isNativeResidencyYearSheetAvailable, NativeResidencyYearSheet } from "../components/native/NativeResidencyYearSheet";
 import { NativeSwitch } from "../components/native/NativeSwitch";
-import { LiquidGlassLayer } from "../components/native/LiquidGlassLayer";
-import { NativeAutomationGuideSheet, isNativeAutomationGuideSheetAvailable } from "../components/native/NativeAutomationGuideSheet";
-import { NativeResidencyYearSheet, isNativeResidencyYearSheetAvailable } from "../components/native/NativeResidencyYearSheet";
-import { NativeReportPreviewSheet, isNativeReportPreviewSheetAvailable } from "../components/native/NativeReportPreviewSheet";
+import { BlurReplaceText } from "../components/ui/blur-replace-text";
+import { DrawerActionButton } from "../components/ui/drawer-action-button";
+import { Text } from "../components/ui/text";
 import { distributionColors, getNeutralPalette, iconStrokeWidth, statusColors } from "../lib/colors";
 import { compactNumber, formatRelativeTime } from "../lib/utils";
 import { formatResidencyYearLabel, getResidencyYearDayCount } from "../services/calculations/residencyYear";
-import { prepareTravelReportPreview, shareTravelReportPdf, type ReportKind, type TravelReportPreview } from "../services/export/reportPdf";
-import { captureAutomaticLocationNow, captureManualLocation, hasBackgroundTrackingPermission, startBackgroundTracking, stopBackgroundTracking } from "../services/tracking/locationTracking";
+import { prepareTravelReportPreview, type ReportKind, shareTravelReportPdf, type TravelReportPreview } from "../services/export/reportPdf";
+import {
+  captureAutomaticLocationNow,
+  captureManualLocation,
+  hasBackgroundTrackingPermission,
+  startBackgroundTracking,
+  stopBackgroundTracking
+} from "../services/tracking/locationTracking";
 import { useAppStore } from "../store/appStore";
 import type { TrackingIntervalHours } from "../types/models";
 
@@ -61,7 +81,10 @@ export function DashboardScreen() {
   const remainingDays = Math.max(0, yearDayCount - totalTrackedDays);
   const countryRows = summary.countryTotals.slice(0, 6);
   const topCountries = summary.countryTotals.slice(0, 3);
-  const otherDays = Math.max(0, summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0));
+  const otherDays = Math.max(
+    0,
+    summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0)
+  );
   const fiscalYearLabel = formatResidencyYearLabel(settings.residencyYearEnd, settings.calendarYearMode);
   const dashboardYearButtonLabel = fiscalYearLabel;
   const currentLocation = summary.currentLocation;
@@ -226,7 +249,10 @@ export function DashboardScreen() {
       const started = await completeAutoTrackEnable(interval);
       if (!started) {
         await updateSetting("trackingPaused", true);
-        Alert.alert("Always location required", "Allow location access always to use Auto Track Location. The app will turn this on when you return after granting permission.");
+        Alert.alert(
+          "Always location required",
+          "Allow location access always to use Auto Track Location. The app will turn this on when you return after granting permission."
+        );
         return;
       }
     } else {
@@ -394,7 +420,14 @@ export function DashboardScreen() {
                   style={[styles.refreshIconButton, { backgroundColor: palette.pill, borderColor: palette.border, opacity: isRefreshingLocation ? 0.55 : 1 }]}
                   onPress={() => void refreshCurrentLocation()}
                 >
-                  <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={58} tint={palette.blurTint} tintColor={palette.pill} style={StyleSheet.absoluteFill} />
+                  <LiquidGlassLayer
+                    colorScheme="auto"
+                    glassStyle="regular"
+                    intensity={58}
+                    tint={palette.blurTint}
+                    tintColor={palette.pill}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <RefreshCw size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
                 </Pressable>
               )}
@@ -416,7 +449,14 @@ export function DashboardScreen() {
             style={[styles.automationButton, { backgroundColor: palette.pill, borderColor: palette.border }]}
             onPress={showAutomationSetup}
           >
-            <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={58} tint={palette.blurTint} tintColor={palette.pill} style={StyleSheet.absoluteFill} />
+            <LiquidGlassLayer
+              colorScheme="auto"
+              glassStyle="regular"
+              intensity={58}
+              tint={palette.blurTint}
+              tintColor={palette.pill}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={styles.glassButtonContent}>
               <Clock3 size={18} color={palette.foreground} strokeWidth={iconStrokeWidth} />
               <Text className="flex-1 text-sm font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ color: palette.foreground }}>
@@ -476,9 +516,7 @@ export function DashboardScreen() {
         </Text>
 
         {countryRows.length > 0 ? (
-          countryRows.map((row, index) => (
-            <CountryCard key={row.countryCode} row={row} palette={palette} />
-          ))
+          countryRows.map((row, index) => <CountryCard key={row.countryCode} row={row} palette={palette} />)
         ) : (
           <Panel palette={palette}>
             <Text className="text-base font-bold" style={{ color: palette.foreground }}>
@@ -489,7 +527,6 @@ export function DashboardScreen() {
             </Text>
           </Panel>
         )}
-
       </View>
       <DashboardQuickMenu
         palette={palette}
@@ -570,10 +607,7 @@ function HeaderGlassButton({
       borderColor: interpolateColor(glow, [0, 1], [palette.glassBorder, palette.glassBorderActive]),
       opacity: interpolate(pressProgress.value, [0, 1], [1, 0.9]),
       shadowOpacity: interpolate(glow, [0, 1], [0.14, 0.28]),
-      transform: [
-        { scale: interpolate(pressProgress.value, [0, 1], [1, 0.95]) },
-        { translateY: interpolate(pressProgress.value, [0, 1], [0, 1]) }
-      ]
+      transform: [{ scale: interpolate(pressProgress.value, [0, 1], [1, 0.95]) }, { translateY: interpolate(pressProgress.value, [0, 1], [0, 1]) }]
     };
   });
 
@@ -601,9 +635,7 @@ function HeaderGlassButton({
       <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.glassFill }]} />
       <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
       <View style={[styles.glassLowlight, styles.noPointerEvents, { backgroundColor: palette.glassLowlight }]} />
-      <View style={styles.headerGlassContent}>
-        {children}
-      </View>
+      <View style={styles.headerGlassContent}>{children}</View>
     </AnimatedPressable>
   );
 }
@@ -657,10 +689,7 @@ function DashboardQuickMenu({
 
   const menuStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [
-      { translateY: interpolate(progress.value, [0, 1], [-10, 0]) },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) }
-    ]
+    transform: [{ translateY: interpolate(progress.value, [0, 1], [-10, 0]) }, { scale: interpolate(progress.value, [0, 1], [0.96, 1]) }]
   }));
 
   function handleShare() {
@@ -949,8 +978,24 @@ function ReportPreviewDrawer({
           </ScrollView>
 
           <View style={styles.drawerActions}>
-            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Close" style={styles.nativeActionButton} onPress={onClose} />
-            <DrawerActionButton disabled={isSharing} backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="square.and.arrow.up" title={isSharing ? "Creating PDF" : "Share PDF"} style={styles.nativeActionButton} onPress={onShare} />
+            <DrawerActionButton
+              backgroundColor={palette.pill}
+              borderColor={palette.glassBorder}
+              foregroundColor={palette.foreground}
+              title="Close"
+              style={styles.nativeActionButton}
+              onPress={onClose}
+            />
+            <DrawerActionButton
+              disabled={isSharing}
+              backgroundColor={palette.accent}
+              borderColor={palette.accent}
+              foregroundColor={palette.accentForeground}
+              systemImage="square.and.arrow.up"
+              title={isSharing ? "Creating PDF" : "Share PDF"}
+              style={styles.nativeActionButton}
+              onPress={onShare}
+            />
           </View>
         </Animated.View>
       </View>
@@ -982,7 +1027,9 @@ function chunkArray<T>(items: T[], size: number) {
 function ReportCalendarDots({ palette, report }: { palette: Palette; report: TravelReportPreview }) {
   const countryColorByCode = useMemo(() => {
     const colors = new Map<string, string>();
-    report.stats.countryTotals.forEach((row, index) => colors.set(row.countryCode, getDistributionColor(index, palette)));
+    report.stats.countryTotals.forEach((row, index) => {
+      colors.set(row.countryCode, getDistributionColor(index, palette));
+    });
     return colors;
   }, [palette, report.stats.countryTotals]);
   const monthsPerRow = report.calendarMonths.length > 1 ? 4 : 1;
@@ -1007,7 +1054,7 @@ function ReportCalendarDots({ palette, report }: { palette: Palette; report: Tra
                     return <View key={slot.key} style={{ height: dotSize, width: dotSize }} />;
                   }
 
-                  const backgroundColor = slot.countryCode ? countryColorByCode.get(slot.countryCode) ?? getDistributionColor(5, palette) : palette.remaining;
+                  const backgroundColor = slot.countryCode ? (countryColorByCode.get(slot.countryCode) ?? getDistributionColor(5, palette)) : palette.remaining;
                   return <View key={slot.key} style={[styles.reportDot, { backgroundColor, height: dotSize, width: dotSize }]} />;
                 })}
               </View>
@@ -1037,13 +1084,7 @@ function AutomationGuideDrawer({
 }) {
   if (Platform.OS === "ios" && isNativeAutomationGuideSheetAvailable) {
     return (
-      <NativeAutomationGuideSheet
-        palette={palette}
-        visible={visible}
-        onClose={onClose}
-        onOpenShortcuts={onOpenShortcuts}
-        onConfirmSetup={onConfirmSetup}
-      />
+      <NativeAutomationGuideSheet palette={palette} visible={visible} onClose={onClose} onOpenShortcuts={onOpenShortcuts} onConfirmSetup={onConfirmSetup} />
     );
   }
 
@@ -1066,7 +1107,13 @@ function AutomationGuideDrawer({
             }
           ]}
         >
-          <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={76} tint={palette.blurTint} style={[StyleSheet.absoluteFill, styles.noPointerEvents]} />
+          <LiquidGlassLayer
+            colorScheme="auto"
+            glassStyle="regular"
+            intensity={76}
+            tint={palette.blurTint}
+            style={[StyleSheet.absoluteFill, styles.noPointerEvents]}
+          />
           <View style={[StyleSheet.absoluteFill, styles.noPointerEvents, { backgroundColor: palette.menuGlassFill }]} />
           <View style={[styles.glassHighlight, styles.noPointerEvents, { backgroundColor: palette.glassHighlight }]} />
           <View style={[styles.yearDrawerRim, styles.noPointerEvents, { borderColor: palette.glassRim }]} />
@@ -1100,11 +1147,34 @@ function AutomationGuideDrawer({
             <StepLine value="Set Run Immediately, then tap Done." palette={palette} />
           </View>
 
-          <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="I created both automations" style={styles.nativeFullButton} onPress={onConfirmSetup} />
+          <DrawerActionButton
+            backgroundColor={palette.accent}
+            borderColor={palette.accent}
+            foregroundColor={palette.accentForeground}
+            systemImage="checkmark"
+            title="I created both automations"
+            style={styles.nativeFullButton}
+            onPress={onConfirmSetup}
+          />
 
           <View style={styles.drawerActions}>
-            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Close" style={styles.nativeActionButton} onPress={onClose} />
-            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="arrow.up.forward.app" title="Open Shortcuts" style={styles.nativeActionButton} onPress={onOpenShortcuts} />
+            <DrawerActionButton
+              backgroundColor={palette.pill}
+              borderColor={palette.glassBorder}
+              foregroundColor={palette.foreground}
+              title="Close"
+              style={styles.nativeActionButton}
+              onPress={onClose}
+            />
+            <DrawerActionButton
+              backgroundColor={palette.accent}
+              borderColor={palette.accent}
+              foregroundColor={palette.accentForeground}
+              systemImage="arrow.up.forward.app"
+              title="Open Shortcuts"
+              style={styles.nativeActionButton}
+              onPress={onOpenShortcuts}
+            />
           </View>
         </View>
       </View>
@@ -1164,7 +1234,9 @@ function YearSelectorDrawer({
   onConfirm: (year: number, calendarYearMode: boolean) => void;
 }) {
   if (Platform.OS === "ios" && isNativeResidencyYearSheetAvailable) {
-    return <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />;
+    return (
+      <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />
+    );
   }
 
   const insets = useSafeAreaInsets();
@@ -1289,7 +1361,13 @@ function YearSelectorDrawer({
           </View>
 
           <View className="mx-5 mt-5 flex-row items-center justify-between rounded-2xl p-2" style={{ backgroundColor: palette.pill }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous year"
+              className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+              style={{ backgroundColor: palette.card }}
+              onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}
+            >
               <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
             </Pressable>
             <View className="items-center">
@@ -1300,19 +1378,52 @@ function YearSelectorDrawer({
                 {draftCalendarYearMode ? "Calendar year" : "India FY"}
               </Text>
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next year"
+              className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+              style={{ backgroundColor: palette.card }}
+              onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}
+            >
               <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
             </Pressable>
           </View>
 
           <View className="mx-5 mt-4 flex-row gap-2">
-            <YearModeButton selected={!draftCalendarYearMode} title="India FY" detail="Apr-Mar" palette={palette} onPress={() => setDraftCalendarYearMode(false)} />
-            <YearModeButton selected={draftCalendarYearMode} title="Calendar" detail="Jan-Dec" palette={palette} onPress={() => setDraftCalendarYearMode(true)} />
+            <YearModeButton
+              selected={!draftCalendarYearMode}
+              title="India FY"
+              detail="Apr-Mar"
+              palette={palette}
+              onPress={() => setDraftCalendarYearMode(false)}
+            />
+            <YearModeButton
+              selected={draftCalendarYearMode}
+              title="Calendar"
+              detail="Jan-Dec"
+              palette={palette}
+              onPress={() => setDraftCalendarYearMode(true)}
+            />
           </View>
 
           <View style={[styles.drawerActions, styles.drawerActionsLarge]}>
-            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.glassBorder} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={confirmSelection} />
+            <DrawerActionButton
+              backgroundColor={palette.pill}
+              borderColor={palette.glassBorder}
+              foregroundColor={palette.foreground}
+              title="Cancel"
+              style={styles.nativeActionButton}
+              onPress={onClose}
+            />
+            <DrawerActionButton
+              backgroundColor={palette.accent}
+              borderColor={palette.accent}
+              foregroundColor={palette.accentForeground}
+              systemImage="checkmark"
+              title="Confirm"
+              style={styles.nativeActionButton}
+              onPress={confirmSelection}
+            />
           </View>
         </Animated.View>
       </View>
@@ -1320,7 +1431,19 @@ function YearSelectorDrawer({
   );
 }
 
-function YearModeButton({ selected, title, detail, palette, onPress }: { selected: boolean; title: string; detail: string; palette: Palette; onPress: () => void }) {
+function YearModeButton({
+  selected,
+  title,
+  detail,
+  palette,
+  onPress
+}: {
+  selected: boolean;
+  title: string;
+  detail: string;
+  palette: Palette;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -1347,7 +1470,10 @@ function YearModeButton({ selected, title, detail, palette, onPress }: { selecte
 
 function Panel({ children, compact = false, palette }: { children: ReactNode; compact?: boolean; palette: Palette }) {
   return (
-    <View className={compact ? "gap-4 rounded-[24px] px-6 py-5" : "gap-6 rounded-[28px] p-6"} style={{ backgroundColor: palette.card, shadowColor: palette.shadow, shadowOpacity: 0.08, shadowRadius: 24 }}>
+    <View
+      className={compact ? "gap-4 rounded-[24px] px-6 py-5" : "gap-6 rounded-[28px] p-6"}
+      style={{ backgroundColor: palette.card, shadowColor: palette.shadow, shadowOpacity: 0.08, shadowRadius: 24 }}
+    >
       {children}
     </View>
   );
@@ -1413,7 +1539,10 @@ function LegendItem({ color, label, value, palette, muted = false }: { color: st
     <View className="flex-row items-center gap-3">
       <View className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
       <Text className="text-sm" numberOfLines={1} style={{ color: textColor }}>
-        {label} <Text className="text-sm font-bold" style={{ color: textColor }}>{compactNumber(value)}</Text>
+        {label}{" "}
+        <Text className="text-sm font-bold" style={{ color: textColor }}>
+          {compactNumber(value)}
+        </Text>
       </Text>
     </View>
   );

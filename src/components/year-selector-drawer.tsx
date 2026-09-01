@@ -1,15 +1,25 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BlurView } from "expo-blur";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react-native";
-import { Modal, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Modal, Platform, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing as ReanimatedEasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  Easing as ReanimatedEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { iconStrokeWidth } from "../lib/colors";
 import { LiquidGlassLayer } from "./native/LiquidGlassLayer";
 import { NativeBottomSheet } from "./native/NativeBottomSheet";
 import { NativePicker } from "./native/NativePicker";
-import { NativeResidencyYearSheet, isNativeResidencyYearSheetAvailable } from "./native/NativeResidencyYearSheet";
+import { isNativeResidencyYearSheetAvailable, NativeResidencyYearSheet } from "./native/NativeResidencyYearSheet";
 import { DrawerActionButton } from "./ui/drawer-action-button";
 import { Text } from "./ui/text";
 
@@ -67,10 +77,7 @@ export function HeaderGlassButton({
       borderColor: interpolateColor(glow, [0, 1], [palette.glassBorder, palette.glassBorderActive]),
       opacity: interpolate(pressProgress.value, [0, 1], [1, 0.9]),
       shadowOpacity: interpolate(glow, [0, 1], [0.14, 0.28]),
-      transform: [
-        { scale: interpolate(pressProgress.value, [0, 1], [1, 0.95]) },
-        { translateY: interpolate(pressProgress.value, [0, 1], [0, 1]) }
-      ]
+      transform: [{ scale: interpolate(pressProgress.value, [0, 1], [1, 0.95]) }, { translateY: interpolate(pressProgress.value, [0, 1], [0, 1]) }]
     };
   });
 
@@ -119,7 +126,9 @@ export function YearSelectorDrawer({
   onConfirm: (year: number, calendarYearMode: boolean) => void;
 }) {
   if (Platform.OS === "ios" && isNativeResidencyYearSheetAvailable) {
-    return <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />;
+    return (
+      <NativeResidencyYearSheet calendarYearMode={calendarYearMode} palette={palette} visible={visible} year={year} onClose={onClose} onConfirm={onConfirm} />
+    );
   }
 
   const insets = useSafeAreaInsets();
@@ -224,7 +233,13 @@ export function YearSelectorDrawer({
         </View>
 
         <View className="mx-5 mt-5 flex-row items-center justify-between rounded-2xl p-2" style={{ backgroundColor: palette.pill }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Previous year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous year"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+            style={{ backgroundColor: palette.card }}
+            onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}
+          >
             <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
           </Pressable>
           <View className="items-center">
@@ -235,7 +250,13 @@ export function YearSelectorDrawer({
               {draftCalendarYearMode ? "Calendar year" : "India FY"}
             </Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Next year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next year"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+            style={{ backgroundColor: palette.card }}
+            onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}
+          >
             <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
           </Pressable>
         </View>
@@ -250,8 +271,23 @@ export function YearSelectorDrawer({
         />
 
         <View style={styles.drawerActionRow}>
-          <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.border} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-          <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={() => onConfirm(draftYear, draftCalendarYearMode)} />
+          <DrawerActionButton
+            backgroundColor={palette.pill}
+            borderColor={palette.border}
+            foregroundColor={palette.foreground}
+            title="Cancel"
+            style={styles.nativeActionButton}
+            onPress={onClose}
+          />
+          <DrawerActionButton
+            backgroundColor={palette.accent}
+            borderColor={palette.accent}
+            foregroundColor={palette.accentForeground}
+            systemImage="checkmark"
+            title="Confirm"
+            style={styles.nativeActionButton}
+            onPress={() => onConfirm(draftYear, draftCalendarYearMode)}
+          />
         </View>
       </NativeBottomSheet>
     );
@@ -301,7 +337,13 @@ export function YearSelectorDrawer({
           </View>
 
           <View className="mx-5 mt-5 flex-row items-center justify-between rounded-2xl p-2" style={{ backgroundColor: palette.pill }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous year"
+              className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+              style={{ backgroundColor: palette.card }}
+              onPress={() => setDraftYear((value) => Math.max(2000, value - 1))}
+            >
               <ChevronLeft size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
             </Pressable>
             <View className="items-center">
@@ -312,19 +354,52 @@ export function YearSelectorDrawer({
                 {draftCalendarYearMode ? "Calendar year" : "India FY"}
               </Text>
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next year" className="h-11 w-11 items-center justify-center rounded-full active:opacity-75" style={{ backgroundColor: palette.card }} onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next year"
+              className="h-11 w-11 items-center justify-center rounded-full active:opacity-75"
+              style={{ backgroundColor: palette.card }}
+              onPress={() => setDraftYear((value) => Math.min(2100, value + 1))}
+            >
               <ChevronRight size={22} color={palette.foreground} strokeWidth={iconStrokeWidth} />
             </Pressable>
           </View>
 
           <View className="mx-5 mt-4 flex-row gap-2">
-            <YearModeButton selected={!draftCalendarYearMode} title="India FY" detail="Apr-Mar" palette={palette} onPress={() => setDraftCalendarYearMode(false)} />
-            <YearModeButton selected={draftCalendarYearMode} title="Calendar" detail="Jan-Dec" palette={palette} onPress={() => setDraftCalendarYearMode(true)} />
+            <YearModeButton
+              selected={!draftCalendarYearMode}
+              title="India FY"
+              detail="Apr-Mar"
+              palette={palette}
+              onPress={() => setDraftCalendarYearMode(false)}
+            />
+            <YearModeButton
+              selected={draftCalendarYearMode}
+              title="Calendar"
+              detail="Jan-Dec"
+              palette={palette}
+              onPress={() => setDraftCalendarYearMode(true)}
+            />
           </View>
 
           <View style={styles.drawerActionRow}>
-            <DrawerActionButton backgroundColor={palette.pill} borderColor={palette.border} foregroundColor={palette.foreground} title="Cancel" style={styles.nativeActionButton} onPress={onClose} />
-            <DrawerActionButton backgroundColor={palette.accent} borderColor={palette.accent} foregroundColor={palette.accentForeground} systemImage="checkmark" title="Confirm" style={styles.nativeActionButton} onPress={() => onConfirm(draftYear, draftCalendarYearMode)} />
+            <DrawerActionButton
+              backgroundColor={palette.pill}
+              borderColor={palette.border}
+              foregroundColor={palette.foreground}
+              title="Cancel"
+              style={styles.nativeActionButton}
+              onPress={onClose}
+            />
+            <DrawerActionButton
+              backgroundColor={palette.accent}
+              borderColor={palette.accent}
+              foregroundColor={palette.accentForeground}
+              systemImage="checkmark"
+              title="Confirm"
+              style={styles.nativeActionButton}
+              onPress={() => onConfirm(draftYear, draftCalendarYearMode)}
+            />
           </View>
         </Animated.View>
       </View>
@@ -342,7 +417,19 @@ function GlassBlurLayer({ tint, intensity, style }: { tint: YearSelectorPalette[
   return <LiquidGlassLayer colorScheme="auto" glassStyle="regular" intensity={intensity} tint={tint} style={style} />;
 }
 
-function YearModeButton({ selected, title, detail, palette, onPress }: { selected: boolean; title: string; detail: string; palette: YearSelectorPalette; onPress: () => void }) {
+function YearModeButton({
+  selected,
+  title,
+  detail,
+  palette,
+  onPress
+}: {
+  selected: boolean;
+  title: string;
+  detail: string;
+  palette: YearSelectorPalette;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"

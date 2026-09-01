@@ -1,6 +1,6 @@
-import Constants from "expo-constants";
-import { exchangeCodeAsync, TokenResponse, type AuthRequest, type AuthSessionResult, type TokenResponseConfig } from "expo-auth-session";
+import { type AuthRequest, type AuthSessionResult, exchangeCodeAsync, TokenResponse, type TokenResponseConfig } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
@@ -38,13 +38,7 @@ export function getGoogleDriveAuthSetup() {
   const hasAndroidClientId = hasValue(extra.googleAndroidClientId);
   const hasWebClientId = hasValue(extra.googleWebClientId);
   const hasPlatformClient =
-    Platform.OS === "ios"
-      ? hasIosClientId && hasIosUrlScheme
-      : Platform.OS === "android"
-        ? hasAndroidClientId
-        : Platform.OS === "web"
-          ? hasWebClientId
-          : false;
+    Platform.OS === "ios" ? hasIosClientId && hasIosUrlScheme : Platform.OS === "android" ? hasAndroidClientId : Platform.OS === "web" ? hasWebClientId : false;
 
   return {
     isExpoGo,
@@ -192,10 +186,7 @@ export async function getGoogleDriveConnectionState() {
   const hasRefreshToken = hasValue(storedToken.refreshToken);
   const token = isDurableTokenShape(storedToken) ? new TokenResponse(storedToken) : null;
   const isFresh = token && hasExpiryMetadata(storedToken) ? TokenResponse.isTokenFresh(token) : false;
-  const expiresAt =
-    hasExpiryMetadata(storedToken)
-      ? new Date((storedToken.issuedAt + storedToken.expiresIn) * 1000).toISOString()
-      : undefined;
+  const expiresAt = hasExpiryMetadata(storedToken) ? new Date((storedToken.issuedAt + storedToken.expiresIn) * 1000).toISOString() : undefined;
   const isConnected = hasRefreshToken || isFresh;
 
   return {

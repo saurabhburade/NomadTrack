@@ -3,14 +3,25 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import { getDb, readSettings, runDbWriteTransaction } from "../../db/database";
 import { uuid } from "../../lib/utils";
+import { assertGoogleAccessToken, GoogleLoginRequiredError, getGoogleAccessToken } from "../auth/googleAuth";
 import { showStatusNotification } from "../notifications/statusNotifications";
-import { assertGoogleAccessToken, getGoogleAccessToken, GoogleLoginRequiredError } from "../auth/googleAuth";
+import { localArtifactNames } from "../privacy/localArtifacts";
 
 const driveFilesUrl = "https://www.googleapis.com/drive/v3/files";
 const uploadUrl = "https://www.googleapis.com/upload/drive/v3/files";
 const driveRootFolderName = "NomadTrack";
 const driveBackupFolderName = "all-data";
 const backupFileName = "travel-nri-tracker-backup.json";
+const maxBackupDownloadBytes = 30 * 1024 * 1024;
+const maxRowsPerTable: Record<BackupTable, number> = {
+  location_points: 250_000,
+  day_records: 20_000,
+  day_country_segments: 100_000,
+  trips: 20_000,
+  pending_geocode_jobs: 250_000,
+  settings: 32
+};
+const maxTotalRestoreRows = 500_000;
 const autoBackupIntervalsMs = {
   "1m": 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
@@ -59,13 +70,7 @@ type BackupProgressOptions = {
   onProgress?: (progress: BackupProgress) => void;
 };
 
-type BackupTable =
-  | "location_points"
-  | "day_records"
-  | "day_country_segments"
-  | "trips"
-  | "pending_geocode_jobs"
-  | "settings";
+type BackupTable = "location_points" | "day_records" | "day_country_segments" | "trips" | "pending_geocode_jobs" | "settings";
 
 const restoreTables: Record<BackupTable, readonly string[]> = {
   location_points: [
@@ -167,7 +172,7 @@ async function createSerializedJsonBackup(options: BackupProgressOptions = {}): 
 
 export async function writeLocalBackupFile(options: BackupProgressOptions = {}) {
   const { header, serializedBackup } = await createSerializedJsonBackup(options);
-  const path = `${FileSystem.documentDirectory}travel-nri-backup-${header.createdAt.slice(0, 10)}.json`;
+  const path = `${FileSystem.documentDirectory}${localArtifactNames.backup(header.createdAt.slice(0, 10))}`;
   const fileItems = [{ id: "local-file", label: "Writing local backup file", status: "active" as const }];
   emitProgress(options, "Backing Up", "Saving local backup file.", fileItems);
   await FileSystem.writeAsStringAsync(path, serializedBackup);
@@ -288,9 +293,7 @@ export async function restoreLatestDriveBackup(options: BackupProgressOptions = 
   const sortedFiles = backupFiles.files.sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
   if (!sortedFiles.length) throw new Error("No Drive backup found to restore.");
 
-  let settingsOnlyBackup:
-    | { file: DriveBackupFile; payload: BackupPayload; counts: Record<BackupTable, number>; displayDate: string }
-    | undefined;
+  let settingsOnlyBackup: { file: DriveBackupFile; payload: BackupPayload; counts: Record<BackupTable, number>; displayDate: string } | undefined;
   let lastError: unknown;
   for (const file of sortedFiles) {
     try {
@@ -385,15 +388,9 @@ async function readBackupYears() {
 
 async function countBackupTravelRows() {
   const db = await getDb();
-  const locationPoints = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM location_points"
-  );
-  const dayRecords = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM day_records"
-  );
-  const trips = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM trips"
-  );
+  const locationPoints = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM location_points");
+  const dayRecords = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM day_records");
+  const trips = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM trips");
 
   return (locationPoints?.count ?? 0) + (dayRecords?.count ?? 0) + (trips?.count ?? 0);
 }
@@ -436,7 +433,9 @@ async function listDriveFolders(accessToken: string, parentId: string) {
 
 async function findDriveFolder(accessToken: string, folderName: string, parentId?: string) {
   const parentQuery = parentId ? ` and '${parentId}' in parents` : "";
-  const query = encodeURIComponent(`name = '${escapeDriveQueryValue(folderName)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentQuery}`);
+  const query = encodeURIComponent(
+    `name = '${escapeDriveQueryValue(folderName)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentQuery}`
+  );
   const response = await fetch(`${driveFilesUrl}?spaces=drive&q=${query}&fields=files(id,name)&pageSize=1`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
@@ -467,6 +466,7 @@ async function parseAndValidateBackup(rawBackup: string): Promise<BackupPayload>
     throw new Error("Downloaded backup is not a supported NomadTrack backup.");
   }
 
+  // This unkeyed digest detects accidental corruption only; it does not authenticate a backup.
   const checksum = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, JSON.stringify(parsed.data));
   if (checksum !== parsed.checksum) {
     throw new Error("Backup checksum did not match. Restore was cancelled.");
@@ -476,26 +476,253 @@ async function parseAndValidateBackup(rawBackup: string): Promise<BackupPayload>
 }
 
 async function downloadAndValidateDriveBackup(accessToken: string, file: DriveBackupFile) {
+  const advertisedSize = Number(file.size);
+  if (Number.isFinite(advertisedSize) && advertisedSize > maxBackupDownloadBytes) {
+    throw new Error("Backup is too large to restore safely.");
+  }
   const response = await fetch(`${driveFilesUrl}/${file.id}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   if (!response.ok) throw await driveError("Drive backup download failed", response);
-  return parseAndValidateBackup(await response.text());
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > maxBackupDownloadBytes) {
+    throw new Error("Backup is too large to restore safely.");
+  }
+  const rawBackup = await response.text();
+  if (new TextEncoder().encode(rawBackup).byteLength > maxBackupDownloadBytes) throw new Error("Backup is too large to restore safely.");
+  return parseAndValidateBackup(rawBackup);
 }
 
 function isBackupPayload(value: unknown): value is BackupPayload {
   if (!isRecord(value)) return false;
-  if (value.backupVersion !== 1 || typeof value.createdAt !== "string" || typeof value.checksum !== "string") return false;
+  if (value.backupVersion !== 1 || !isIsoTimestamp(value.createdAt) || typeof value.checksum !== "string" || !/^[a-f0-9]{64}$/i.test(value.checksum))
+    return false;
   if (!isRecord(value.scope)) return false;
-  if (typeof value.scope.label !== "string" || typeof value.scope.startDate !== "string" || typeof value.scope.endDate !== "string") return false;
+  if (!isText(value.scope.label, 256) || !isText(value.scope.startDate, 32) || !isText(value.scope.endDate, 32)) return false;
   if (value.scope.kind !== undefined && value.scope.kind !== "all" && value.scope.kind !== "date_range") return false;
+  if (value.scope.kind !== "all" && (!isIsoDate(value.scope.startDate) || !isIsoDate(value.scope.endDate) || value.scope.startDate > value.scope.endDate))
+    return false;
   if (!isRecord(value.data)) return false;
   const data = value.data;
 
-  return (Object.keys(restoreTables) as BackupTable[]).every((table) => {
-    const rows = data[table];
-    return rows === undefined || Array.isArray(rows);
-  });
+  if (
+    !(Object.keys(restoreTables) as BackupTable[]).every((table) => {
+      const rows = data[table];
+      return rows === undefined || Array.isArray(rows);
+    })
+  )
+    return false;
+
+  let totalRows = 0;
+  for (const table of Object.keys(restoreTables) as BackupTable[]) {
+    const rows = data[table] as unknown[] | undefined;
+    if (!rows) continue;
+    if (rows.length > maxRowsPerTable[table]) return false;
+    totalRows += rows.length;
+    if (!rows.every((row) => isValidBackupRow(table, row))) return false;
+  }
+  return totalRows <= maxTotalRestoreRows;
+}
+
+const locationSources = new Set([
+  "gps",
+  "gps_offline",
+  "manual",
+  "photo",
+  "import",
+  "visit",
+  "slc",
+  "region-exit",
+  "region-enter",
+  "shortcuts",
+  "charger-connected"
+]);
+const reverseGeocodeStatuses = new Set(["pending", "done", "failed"]);
+const geocodeJobStatuses = new Set(["pending", "processing", "done", "failed"]);
+const settingValidators: Record<string, (value: unknown) => boolean> = {
+  trackingInterval: (value) => value === "1m" || value === "manual" || [1, 2, 4, 8].includes(value as number),
+  batterySaver: isBoolean,
+  trackingPaused: isBoolean,
+  fiscalYearStartMonth: (value) => isIntegerInRange(value, 1, 12),
+  fiscalYearStartDay: (value) => isIntegerInRange(value, 1, 31),
+  residencyYearEnd: (value) => isIntegerInRange(value, 1900, 3000),
+  calendarYearMode: isBoolean,
+  dayCountingRule: (value) => value === "departure" || value === "arrival" || value === "longest_duration" || value === "manual",
+  autoBackup: isBoolean,
+  autoBackupFrequency: (value) => value === "1m" || value === "daily" || value === "weekly" || value === "monthly",
+  wifiOnlyBackup: isBoolean,
+  appearance: (value) => value === "system" || value === "light" || value === "dark",
+  cloudBackupEnabled: isBoolean,
+  onboardingCompleted: isBoolean,
+  shortcutsAutomationClaimedAt: (value) => value === undefined || isIsoTimestamp(value),
+  shortcutsAutomationLastVerifiedAt: (value) => value === undefined || isIsoTimestamp(value)
+};
+
+function isValidBackupRow(table: BackupTable, value: unknown) {
+  if (!isRecord(value)) return false;
+  switch (table) {
+    case "location_points":
+      return (
+        isId(value.id) &&
+        isIsoTimestamp(value.timestamp) &&
+        isLatitude(value.latitude) &&
+        isLongitude(value.longitude) &&
+        isFiniteNumberInRange(value.accuracy, 0, 1_000_000) &&
+        isNullableNumberInRange(value.altitude, -20_000, 100_000) &&
+        isNullableNumberInRange(value.speed, -1, 10_000) &&
+        isNullableNumberInRange(value.heading, -1, 360) &&
+        isNullableText(value.timezone, 128) &&
+        isNullableCountryCode(value.country_code) &&
+        isNullableText(value.country_name, 256) &&
+        isNullableText(value.region, 256) &&
+        isNullableText(value.city, 256) &&
+        isEnum(value.source, locationSources) &&
+        isEnum(value.reverse_geocode_status, reverseGeocodeStatuses) &&
+        isIsoTimestamp(value.created_at) &&
+        isIsoTimestamp(value.updated_at)
+      );
+    case "day_records":
+      return (
+        isIsoDate(value.date) &&
+        isNullableCountryCode(value.primary_country_code) &&
+        isNullableText(value.primary_country_name, 256) &&
+        isCountryCodeArrayJson(value.countries_visited) &&
+        isSqlBoolean(value.is_travel_day) &&
+        isSqlBoolean(value.is_pending_validation) &&
+        isSqlBoolean(value.is_manual_override) &&
+        isNullableText(value.notes, 10_000) &&
+        isIsoTimestamp(value.created_at) &&
+        isIsoTimestamp(value.updated_at)
+      );
+    case "day_country_segments":
+      return (
+        isId(value.id) &&
+        isIsoDate(value.date) &&
+        isNullableCountryCode(value.country_code) &&
+        isNullableText(value.country_name, 256) &&
+        isIsoTimestamp(value.start_time) &&
+        isIsoTimestamp(value.end_time) &&
+        isEnum(value.source, locationSources) &&
+        isFiniteNumberInRange(value.confidence, 0, 1) &&
+        isSqlBoolean(value.is_pending_validation) &&
+        isIsoTimestamp(value.created_at) &&
+        isIsoTimestamp(value.updated_at) &&
+        isTimestampRange(value.start_time, value.end_time)
+      );
+    case "trips":
+      return (
+        isId(value.id) &&
+        isDateRange(value.start_date, value.end_date) &&
+        isCountryCode(value.country_code) &&
+        isText(value.country_name, 256) &&
+        isStringArrayJson(value.cities, 256) &&
+        isNullableText(value.notes, 10_000) &&
+        isSqlBoolean(value.is_ghost) &&
+        isIsoTimestamp(value.created_at) &&
+        isIsoTimestamp(value.updated_at)
+      );
+    case "pending_geocode_jobs":
+      return (
+        isId(value.id) &&
+        isId(value.location_point_id) &&
+        isLatitude(value.latitude) &&
+        isLongitude(value.longitude) &&
+        isIsoTimestamp(value.timestamp) &&
+        isEnum(value.status, geocodeJobStatuses) &&
+        isIntegerInRange(value.retry_count, 0, 100) &&
+        isNullableIsoTimestamp(value.last_attempt_at) &&
+        isNullableText(value.error, 4_000) &&
+        isIsoTimestamp(value.created_at) &&
+        isIsoTimestamp(value.updated_at)
+      );
+    case "settings":
+      return isValidSettingRow(value);
+  }
+}
+
+function isValidSettingRow(value: Record<string, unknown>) {
+  if (typeof value.key !== "string" || !Object.hasOwn(settingValidators, value.key) || !isText(value.value, 4_000) || !isIsoTimestamp(value.updated_at))
+    return false;
+  try {
+    return settingValidators[value.key]!(JSON.parse(value.value));
+  } catch {
+    return false;
+  }
+}
+
+function isId(value: unknown) {
+  return isText(value, 256);
+}
+function isText(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+function isNullableText(value: unknown, maxLength: number) {
+  return value === null || value === undefined || (typeof value === "string" && value.length <= maxLength);
+}
+function isFiniteNumberInRange(value: unknown, min: number, max: number) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+function isNullableNumberInRange(value: unknown, min: number, max: number) {
+  return value === null || value === undefined || isFiniteNumberInRange(value, min, max);
+}
+function isIntegerInRange(value: unknown, min: number, max: number) {
+  return Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
+}
+function isBoolean(value: unknown) {
+  return typeof value === "boolean";
+}
+function isSqlBoolean(value: unknown) {
+  return value === 0 || value === 1 || value === false || value === true;
+}
+function isLatitude(value: unknown) {
+  return isFiniteNumberInRange(value, -90, 90);
+}
+function isLongitude(value: unknown) {
+  return isFiniteNumberInRange(value, -180, 180);
+}
+function isCountryCode(value: unknown) {
+  return typeof value === "string" && /^[A-Z]{2}$/.test(value);
+}
+function isNullableCountryCode(value: unknown) {
+  return value === null || value === undefined || isCountryCode(value);
+}
+function isEnum(value: unknown, values: Set<string>) {
+  return typeof value === "string" && values.has(value);
+}
+function isIsoDate(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) &&
+    new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value
+  );
+}
+function isIsoTimestamp(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 64 && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+}
+function isNullableIsoTimestamp(value: unknown) {
+  return value === null || value === undefined || isIsoTimestamp(value);
+}
+function isDateRange(start: unknown, end: unknown) {
+  return isIsoDate(start) && isIsoDate(end) && start <= end;
+}
+function isTimestampRange(start: unknown, end: unknown) {
+  return isIsoTimestamp(start) && isIsoTimestamp(end) && Date.parse(start) <= Date.parse(end);
+}
+function isCountryCodeArrayJson(value: unknown) {
+  return isJsonArray(value, (item) => isCountryCode(item));
+}
+function isStringArrayJson(value: unknown, maxItemLength: number) {
+  return isJsonArray(value, (item) => typeof item === "string" && item.length <= maxItemLength);
+}
+function isJsonArray(value: unknown, itemValidator: (item: unknown) => boolean) {
+  if (!isText(value, 10_000)) return false;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length <= 512 && parsed.every(itemValidator);
+  } catch {
+    return false;
+  }
 }
 
 async function restoreBackupPayload(payload: BackupPayload, file: DriveBackupFile, options: BackupProgressOptions = {}) {
@@ -611,7 +838,10 @@ async function insertBackupRows(db: Awaited<ReturnType<typeof getDb>>, table: Ba
 
   for (const row of rows) {
     if (!isRecord(row)) throw new Error(`Backup contains an invalid ${table} row.`);
-    await db.runAsync(sql, columns.map((column) => toSqlValue(row[column])));
+    await db.runAsync(
+      sql,
+      columns.map((column) => toSqlValue(row[column]))
+    );
   }
 }
 
@@ -623,13 +853,7 @@ function countBackupRows(payload: BackupPayload) {
 }
 
 function countTravelRows(counts: Record<BackupTable, number>) {
-  return (
-    counts.location_points +
-    counts.day_records +
-    counts.day_country_segments +
-    counts.trips +
-    counts.pending_geocode_jobs
-  );
+  return counts.location_points + counts.day_records + counts.day_country_segments + counts.trips + counts.pending_geocode_jobs;
 }
 
 function getRestoreDisplayDate(payload: BackupPayload) {
@@ -663,7 +887,9 @@ function escapeDriveQueryValue(value: string) {
 async function driveError(prefix: string, response: Response) {
   const body = await response.text();
   if (response.status === 401) {
-    return new GoogleLoginRequiredError(`${prefix} with ${response.status}. Please log in with Google again. Backup won't work unless Google Drive is connected.`);
+    return new GoogleLoginRequiredError(
+      `${prefix} with ${response.status}. Please log in with Google again. Backup won't work unless Google Drive is connected.`
+    );
   }
   return new Error(`${prefix} with ${response.status}${formatDriveErrorBody(body)}`);
 }

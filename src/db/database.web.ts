@@ -1,6 +1,6 @@
-import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
 import { getCurrentLocalYear, uuid } from "../lib/utils";
 import { getResidencyYearWindow } from "../services/calculations/residencyYear";
+import type { AppSettings, DashboardSummary, LocationPoint, PendingGeocodeJob, Trip } from "../types/models";
 
 const SETTINGS_KEY = "travel-nri-tracker.settings";
 const POINTS_KEY = "travel-nri-tracker.locationPoints";
@@ -195,12 +195,7 @@ export async function readTrips(): Promise<Trip[]> {
   return readStoredTrips().sort((a, b) => b.startDate.localeCompare(a.startDate));
 }
 
-export async function insertManualTravelEntry(entry: {
-  startDate: string;
-  endDate: string;
-  countryCode: string;
-  countryName: string;
-}) {
+export async function insertManualTravelEntry(entry: { startDate: string; endDate: string; countryCode: string; countryName: string }) {
   const trip: Trip = {
     id: uuid("trip"),
     startDate: entry.startDate,
@@ -232,12 +227,7 @@ export async function insertManualTravelEntry(entry: {
   return trip.id;
 }
 
-export async function updateManualDayEntry(entry: {
-  originalDate: string;
-  date: string;
-  countryCode: string;
-  countryName: string;
-}) {
+export async function updateManualDayEntry(entry: { originalDate: string; date: string; countryCode: string; countryName: string }) {
   const affectedDates = entry.originalDate === entry.date ? [entry.date] : [entry.originalDate, entry.date];
   let trips = readStoredTrips();
 

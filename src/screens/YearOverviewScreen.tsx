@@ -1,39 +1,21 @@
+import { useRouter } from "expo-router";
+import { CalendarDays, ChevronLeft, Clock3, Crown, type LucideIcon, Map as MapIcon } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Platform, ScrollView, StyleSheet, useColorScheme, useWindowDimensions, View } from "react-native";
-import { useRouter } from "expo-router";
-import { CalendarDays, ChevronLeft, Clock3, Crown, Map as MapIcon, type LucideIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text } from "../components/ui/text";
 import { NativeDashboardHeaderActions } from "../components/native/NativeDashboardHeaderActions";
+import { Text } from "../components/ui/text";
 import { HeaderGlassButton, YearSelectorDrawer } from "../components/year-selector-drawer";
-import { compactNumber } from "../lib/utils";
 import { getNeutralPalette, iconStrokeWidth } from "../lib/colors";
-import {
-  formatResidencyYearLabel,
-  getResidencyYearDayCount,
-  getResidencyYearMonths,
-  getResidencyYearWindow
-} from "../services/calculations/residencyYear";
+import { compactNumber } from "../lib/utils";
+import { formatResidencyYearLabel, getResidencyYearDayCount, getResidencyYearMonths, getResidencyYearWindow } from "../services/calculations/residencyYear";
 import { useAppStore } from "../store/appStore";
 
 type Palette = ReturnType<typeof getPalette>;
 type MonthSlot = { key: string; iso?: string };
 const dashboardHeaderTopSpacing = 20;
 
-const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-];
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export function YearOverviewScreen() {
   const router = useRouter();
@@ -48,13 +30,18 @@ export function YearOverviewScreen() {
   const totalTrackedDays = summary.countryTotals.reduce((sum, row) => sum + row.days, 0);
   const remainingDays = Math.max(0, yearDayCount - totalTrackedDays);
   const topCountries = summary.countryTotals.slice(0, 3);
-  const otherDays = Math.max(0, summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0));
+  const otherDays = Math.max(
+    0,
+    summary.countryTotals.slice(3).reduce((sum, row) => sum + row.days, 0)
+  );
   const window = useMemo(() => getResidencyYearWindow(settings), [settings]);
   const months = useMemo(() => getResidencyYearMonths(settings), [settings]);
   const recordsByDate = useMemo(() => new Map(yearRecords.map((record) => [record.date, record])), [yearRecords]);
   const countryColorByCode = useMemo(() => {
     const colors = new Map<string, string>();
-    topCountries.forEach((row, index) => colors.set(row.countryCode, getOverviewDistributionColor(index, palette)));
+    topCountries.forEach((row, index) => {
+      colors.set(row.countryCode, getOverviewDistributionColor(index, palette));
+    });
     return colors;
   }, [palette, topCountries]);
   const yearLabel = formatResidencyYearLabel(settings.residencyYearEnd, settings.calendarYearMode);

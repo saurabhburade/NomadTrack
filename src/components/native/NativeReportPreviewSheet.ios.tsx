@@ -1,12 +1,5 @@
 import { useMemo } from "react";
-import {
-  requireNativeComponent,
-  StyleSheet,
-  UIManager,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
+import { requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 import type { TravelReportPreview } from "../../services/export/reportPdf";
 
 export type NativeReportPreviewSheetPalette = {
@@ -48,9 +41,7 @@ type NativeReportPreviewSheetProps = {
 
 export const isNativeReportPreviewSheetAvailable = UIManager.getViewManagerConfig?.("ReportPreviewSheetView") != null;
 
-const ReportPreviewSheetView = isNativeReportPreviewSheetAvailable
-  ? requireNativeComponent<NativeReportPreviewSheetViewProps>("ReportPreviewSheetView")
-  : null;
+const ReportPreviewSheetView = isNativeReportPreviewSheetAvailable ? requireNativeComponent<NativeReportPreviewSheetViewProps>("ReportPreviewSheetView") : null;
 
 export function NativeReportPreviewSheet({ isSharing, palette, report, style, visible, onClose, onShare }: NativeReportPreviewSheetProps) {
   const reportJson = useMemo(() => (report ? JSON.stringify(report) : ""), [report]);

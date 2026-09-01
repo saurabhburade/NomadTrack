@@ -1,5 +1,5 @@
 import { BottomSheet } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { LiquidGlassLayer } from "./LiquidGlassLayer";
 
 type NativeBottomSheetProps = {

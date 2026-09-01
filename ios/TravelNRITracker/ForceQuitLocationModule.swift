@@ -146,6 +146,11 @@ final class ForceQuitLocationService: NSObject, CLLocationManagerDelegate {
     writePendingEvents(remaining)
   }
 
+  func clearPendingEvents() {
+    pendingLocationSource = nil
+    UserDefaults.standard.removeObject(forKey: pendingEventsKey)
+  }
+
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
     if isMonitoringEnabled {
       startMonitoringIfAuthorized()
@@ -153,6 +158,7 @@ final class ForceQuitLocationService: NSObject, CLLocationManagerDelegate {
   }
 
   func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
+    guard isMonitoringEnabled else { return }
     enqueue(
       source: "visit",
       coordinate: visit.coordinate,
@@ -163,11 +169,12 @@ final class ForceQuitLocationService: NSObject, CLLocationManagerDelegate {
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     guard let location = locations.last else { return }
-    let source = pendingLocationSource ?? "slc"
+    let requestedSource = pendingLocationSource
     pendingLocationSource = nil
+    guard isMonitoringEnabled || requestedSource != nil else { return }
 
     enqueue(
-      source: source,
+      source: requestedSource ?? "slc",
       coordinate: location.coordinate,
       accuracy: max(location.horizontalAccuracy, 0),
       timestamp: location.timestamp
@@ -176,6 +183,7 @@ final class ForceQuitLocationService: NSObject, CLLocationManagerDelegate {
   }
 
   func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
+    guard isMonitoringEnabled else { return }
     guard region.identifier.hasPrefix("nomadtrack-anchor-") else { return }
     pendingLocationSource = "region-exit"
     locationManager.requestLocation()
@@ -335,6 +343,17 @@ final class ForceQuitLocationModule: RCTEventEmitter {
   ) {
     ForceQuitLocationService.shared.markProcessed(ids: ids)
     resolve(true)
+  }
+
+  @objc(clearPendingLocationEvents:rejecter:)
+  func clearPendingLocationEvents(
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      ForceQuitLocationService.shared.clearPendingEvents()
+      resolve(true)
+    }
   }
 
   func sendLocationEvent(_ event: [String: Any]) {

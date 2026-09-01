@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, Pressable, type StyleProp, StyleSheet, Text, type ViewStyle } from "react-native";
 
 type NativeDatePickerProps = {
   color?: ColorValue;

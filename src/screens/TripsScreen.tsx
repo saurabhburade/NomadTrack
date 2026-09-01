@@ -1,5 +1,5 @@
-import { ScrollView, useColorScheme, View } from "react-native";
 import { Plane, Plus } from "lucide-react-native";
+import { ScrollView, useColorScheme, View } from "react-native";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Text } from "../components/ui/text";
@@ -13,7 +13,12 @@ export function TripsScreen() {
   const palette = getNeutralPalette(isDark);
 
   return (
-    <ScrollView className="flex-1 bg-background" contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}>
+    <ScrollView
+      className="flex-1 bg-background"
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+    >
       <View className="gap-4 px-4 pb-8 pt-5">
         <View className="flex-row items-center justify-between">
           <View className="flex-1">

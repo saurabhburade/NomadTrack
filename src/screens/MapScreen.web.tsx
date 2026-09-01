@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderGlassButton, YearSelectorDrawer, getFiscalYearLabel } from "../components/year-selector-drawer";
 import { Card } from "../components/ui/card";
 import { Text } from "../components/ui/text";
+import { getFiscalYearLabel, HeaderGlassButton, YearSelectorDrawer } from "../components/year-selector-drawer";
 import { getNeutralPalette } from "../lib/colors";
 import { formatRelativeTime } from "../lib/utils";
 import { useAppStore } from "../store/appStore";
@@ -56,10 +56,10 @@ export function MapScreen() {
         </View>
 
         <Card className="gap-3" style={{ backgroundColor: palette.card, borderColor: palette.border }}>
-          <Text variant="subtitle" style={{ color: palette.foreground }}>Location Heatmap</Text>
-          <Text variant="muted">
-            Web preview lists selected year map days because native heatmap rendering is available only in the mobile app.
+          <Text variant="subtitle" style={{ color: palette.foreground }}>
+            Location Heatmap
           </Text>
+          <Text variant="muted">Web preview lists selected year map days because native heatmap rendering is available only in the mobile app.</Text>
           <Text variant="caption">
             {yearLabel} - {dayEntries.length} {dayEntries.length === 1 ? "day" : "days"}
           </Text>
@@ -74,7 +74,9 @@ export function MapScreen() {
           ) : (
             dayEntries.map((entry) => (
               <Card key={`${entry.source}:${entry.date}`} className="gap-1" style={{ backgroundColor: palette.card, borderColor: palette.border }}>
-                <Text variant="subtitle" style={{ color: palette.foreground }}>{entry.countryName ?? "Pending location"}</Text>
+                <Text variant="subtitle" style={{ color: palette.foreground }}>
+                  {entry.countryName ?? "Pending location"}
+                </Text>
                 <Text variant="muted">{entry.date}</Text>
                 {typeof entry.latitude === "number" && typeof entry.longitude === "number" ? (
                   <Text variant="caption">

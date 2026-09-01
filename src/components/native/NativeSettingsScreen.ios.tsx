@@ -1,12 +1,4 @@
-import {
-  requireNativeComponent,
-  StyleSheet,
-  UIManager,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle
-} from "react-native";
+import { type NativeSyntheticEvent, requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 
 export type NativeSettingsPalette = {
   screen: string;
@@ -127,9 +119,7 @@ type NativeSettingsScreenProps = {
 
 export const isNativeSettingsScreenAvailable = UIManager.getViewManagerConfig?.("SettingsScreenView") != null;
 
-const SettingsScreenView = isNativeSettingsScreenAvailable
-  ? requireNativeComponent<SettingsScreenViewProps>("SettingsScreenView")
-  : null;
+const SettingsScreenView = isNativeSettingsScreenAvailable ? requireNativeComponent<SettingsScreenViewProps>("SettingsScreenView") : null;
 
 export function NativeSettingsScreen({
   accountDetail,

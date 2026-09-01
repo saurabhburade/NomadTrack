@@ -1,5 +1,5 @@
 import { CircularProgress, Host, LinearProgress } from "@expo/ui/swift-ui";
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativeProgressProps = {
   color?: ColorValue;
@@ -12,11 +12,7 @@ export function NativeProgress({ color, progress = null, style, variant = "circu
   return (
     <View style={[variant === "linear" ? styles.linearShell : styles.circularShell, style]}>
       <Host matchContents>
-        {variant === "linear" ? (
-          <LinearProgress color={color} progress={progress} />
-        ) : (
-          <CircularProgress color={color} progress={progress} />
-        )}
+        {variant === "linear" ? <LinearProgress color={color} progress={progress} /> : <CircularProgress color={color} progress={progress} />}
       </Host>
     </View>
   );

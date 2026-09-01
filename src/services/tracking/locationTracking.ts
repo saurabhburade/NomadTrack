@@ -5,12 +5,12 @@ import * as TaskManager from "expo-task-manager";
 import { NativeEventEmitter, NativeModules, Platform } from "react-native";
 import { enqueueGeocodeJob, insertLocationPoint, readLocationPointsForDate, readSettings, writeSetting } from "../../db/database";
 import { toIsoDate, uuid } from "../../lib/utils";
+import type { LocationSource, TrackingIntervalHours } from "../../types/models";
 import { runAutoBackupIfDue } from "../backup/driveBackup";
 import { recalculateDayForPoints } from "../calculations/dayAssignment";
 import { resolveCountryFromBoundaries } from "../geocoding/countryBoundaryLookup";
 import { processGeocodeQueue } from "../geocoding/geocodeQueue";
 import { showStatusNotification } from "../notifications/statusNotifications";
-import type { LocationSource, TrackingIntervalHours } from "../../types/models";
 
 export const LOCATION_TASK_NAME = "travel-nri-background-location";
 
@@ -36,6 +36,7 @@ type ForceQuitLocationModule = {
   stopMonitoring?: () => Promise<boolean>;
   getPendingLocationEvents?: () => Promise<CoreLocationWakeEvent[]>;
   markLocationEventsProcessed?: (ids: string[]) => Promise<boolean>;
+  clearPendingLocationEvents?: () => Promise<boolean>;
 };
 
 type CoreLocationWakeTriggerOptions = {
@@ -162,6 +163,11 @@ export async function stopBackgroundTracking() {
   const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
   if (isRegistered) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
   return true;
+}
+
+export async function clearPendingNativeLocationEvents() {
+  if (Platform.OS !== "ios" || !forceQuitLocationModule?.clearPendingLocationEvents) return;
+  await forceQuitLocationModule.clearPendingLocationEvents();
 }
 
 export async function captureManualLocation() {

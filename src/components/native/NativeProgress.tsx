@@ -1,4 +1,4 @@
-import { StyleSheet, View, type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { type ColorValue, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 
 type NativeProgressProps = {
   color?: ColorValue;

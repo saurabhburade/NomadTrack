@@ -1,4 +1,4 @@
-import { requireNativeComponent, StyleSheet, UIManager, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
+import { requireNativeComponent, type StyleProp, StyleSheet, UIManager, type ViewProps, type ViewStyle } from "react-native";
 
 type CalendarToolbarViewProps = ViewProps & {
   foregroundColorValue: string;
@@ -21,9 +21,7 @@ type NativeCalendarToolbarProps = {
 
 export const isNativeCalendarToolbarAvailable = UIManager.getViewManagerConfig?.("CalendarToolbarView") != null;
 
-const CalendarToolbarView = isNativeCalendarToolbarAvailable
-  ? requireNativeComponent<CalendarToolbarViewProps>("CalendarToolbarView")
-  : null;
+const CalendarToolbarView = isNativeCalendarToolbarAvailable ? requireNativeComponent<CalendarToolbarViewProps>("CalendarToolbarView") : null;
 
 export function NativeCalendarToolbar({
   foregroundColor,

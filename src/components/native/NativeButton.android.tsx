@@ -1,6 +1,6 @@
-import { Button as ComposeButton } from "@expo/ui/jetpack-compose";
 import type { ButtonProps as ComposeButtonProps } from "@expo/ui/jetpack-compose";
-import { type ColorValue, type StyleProp, type ViewStyle } from "react-native";
+import { Button as ComposeButton } from "@expo/ui/jetpack-compose";
+import type { ColorValue, StyleProp, ViewStyle } from "react-native";
 
 type NativeButtonProps = {
   accessibilityLabel?: string;

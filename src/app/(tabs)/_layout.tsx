@@ -1,5 +1,5 @@
-import { DynamicColorIOS, Platform } from "react-native";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { DynamicColorIOS, Platform } from "react-native";
 
 const adaptiveForeground =
   Platform.OS === "ios"

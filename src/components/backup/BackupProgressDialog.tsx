@@ -1,9 +1,9 @@
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, View } from "react-native";
 import { CheckCircle2 } from "lucide-react-native";
-import { NativeProgress } from "../native/NativeProgress";
-import { BlurReplaceText } from "../ui/blur-replace-text";
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, View } from "react-native";
 import { iconStrokeWidth } from "../../lib/colors";
 import type { BackupProgress } from "../../services/backup/driveBackup";
+import { NativeProgress } from "../native/NativeProgress";
+import { BlurReplaceText } from "../ui/blur-replace-text";
 
 export type BackupProgressDialogPalette = {
   backdrop: string;
@@ -49,13 +49,7 @@ export function BackupProgressDialog({ palette, progress, visible }: BackupProgr
             </View>
           </View>
 
-          <NativeProgress
-            color={palette.tint}
-            progress={completedCount / totalCount}
-            variant="linear"
-            style={styles.progress}
-            trackColor={palette.track}
-          />
+          <NativeProgress color={palette.tint} progress={completedCount / totalCount} variant="linear" style={styles.progress} trackColor={palette.track} />
 
           <ScrollView style={styles.items} contentContainerStyle={styles.itemsContent} showsVerticalScrollIndicator={false}>
             {progress.items.map((item) => (
