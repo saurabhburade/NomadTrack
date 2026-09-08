@@ -8,6 +8,17 @@ updates:
     groups:
       development-dependencies:
         dependency-type: development
+    ignore:
+      # Expo/React Native major upgrades must be performed as coordinated SDK
+      # migrations rather than isolated package bumps.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+      # Native React Native packages are tied to the installed Expo SDK even
+      # when their own semver range would otherwise permit a minor update.
+      - dependency-name: "react-native*"
+        update-types:
+          - version-update:semver-minor
 
   - package-ecosystem: github-actions
     directory: "/"
