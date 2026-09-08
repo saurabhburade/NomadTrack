@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   dependency-security:
@@ -36,6 +37,9 @@ jobs:
 
       - name: Install locked dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Validate Expo dependency compatibility
+        run: pnpm exec expo install --check
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=moderate
